@@ -7,14 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 6;
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
     public static final String COL_USUARIO_ID = "id";
-    public static final String COL_USUARIO_USERNAME = "username";
-    public static final String COL_USUARIO_PASSWORD = "password";
     public static final String COL_USUARIO_NOMBRE = "nombre";
+    public static final String COL_USUARIO_PIN = "pin";
     public static final String COL_USUARIO_ROL = "rol";
     
     // Tabla Animales
@@ -98,11 +97,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Crear tabla Usuarios
+        // La app usa PIN numérico de 4 a 6 dígitos para iniciar sesión.
         String createUsuarios = "CREATE TABLE " + TABLE_USUARIOS + " (" +
                 COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                COL_USUARIO_USERNAME + " TEXT UNIQUE NOT NULL, " +
-                COL_USUARIO_PASSWORD + " TEXT NOT NULL, " +
                 COL_USUARIO_NOMBRE + " TEXT NOT NULL, " +
+            COL_USUARIO_PIN + " TEXT NOT NULL, " +
+            "CHECK (length(" + COL_USUARIO_PIN + ") BETWEEN 4 AND 6), " +
+            "CHECK (" + COL_USUARIO_PIN + " GLOB '[0-9]*'), " +
+            "CHECK (" + COL_USUARIO_PIN + " NOT GLOB '*[^0-9]*'), " +
                 COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO')";
         db.execSQL(createUsuarios);
         
@@ -185,11 +187,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(createAlimentacion);
         
         // Usuario administrador por defecto del sistema
-        // Credenciales: usuario='admin', contraseña='admin123', rol='ADMIN'
-        // El usuario puede crear UN usuario adicional desde la app
-        db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" + 
-                COL_USUARIO_USERNAME + ", " + COL_USUARIO_PASSWORD + ", " + COL_USUARIO_NOMBRE + ", " + COL_USUARIO_ROL +
-                ") VALUES ('admin', 'admin123', 'Administrador', 'ADMIN')");
+        // PIN inicial de admin: 1234 (se recomienda forzar cambio en el flujo de app).
+        db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" +
+            COL_USUARIO_NOMBRE + ", " + COL_USUARIO_PIN + ", " + COL_USUARIO_ROL +
+            ") VALUES ('Administrador', '1234', 'ADMIN')");
     }
     
     @Override
@@ -208,7 +209,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Migración de versión 3 a 4: agregar columna rol a usuarios
             db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " ADD COLUMN " + COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO'");
             // Actualizar el usuario admin existente con rol ADMIN
-            db.execSQL("UPDATE " + TABLE_USUARIOS + " SET " + COL_USUARIO_ROL + " = 'ADMIN' WHERE " + COL_USUARIO_USERNAME + " = 'admin'");
+            db.execSQL("UPDATE " + TABLE_USUARIOS + " SET " + COL_USUARIO_ROL + " = 'ADMIN' WHERE " + COL_USUARIO_NOMBRE + " = 'Administrador'");
+        }
+        if (oldVersion < 5) {
+            // Migración de versión 4 a 5: eliminar usuario/contraseña del esquema.
+            db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " RENAME TO usuarios_old");
+            db.execSQL("CREATE TABLE " + TABLE_USUARIOS + " (" +
+                    COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COL_USUARIO_NOMBRE + " TEXT NOT NULL, " +
+                    COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO')");
+            db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" + COL_USUARIO_ID + ", " + COL_USUARIO_NOMBRE + ", " + COL_USUARIO_ROL + ") " +
+                    "SELECT " + COL_USUARIO_ID + ", " + COL_USUARIO_NOMBRE + ", " + COL_USUARIO_ROL + " FROM usuarios_old");
+            db.execSQL("DROP TABLE usuarios_old");
+        }
+        if (oldVersion < 6) {
+            // Migración de versión 5 a 6: agregar PIN numérico para inicio de sesión.
+            db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " ADD COLUMN " + COL_USUARIO_PIN + " TEXT NOT NULL DEFAULT '1234'");
+            // Normalizar datos heredados para mantener regla 4-6 dígitos.
+            db.execSQL("UPDATE " + TABLE_USUARIOS + " SET " + COL_USUARIO_PIN + " = '1234' " +
+                "WHERE " + COL_USUARIO_PIN + " IS NULL OR length(" + COL_USUARIO_PIN + ") < 4 " +
+                "OR length(" + COL_USUARIO_PIN + ") > 6 " +
+                "OR " + COL_USUARIO_PIN + " GLOB '*[^0-9]*'");
         }
     }
     

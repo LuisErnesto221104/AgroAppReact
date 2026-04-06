@@ -1,6 +1,6 @@
 # DATABASE.md — Esquema SQLite · Diagrama ER · DAOs · ACID
 
-> AgroApp · DatabaseHelper.java v4 · Sprint 0  
+> AgroApp · DatabaseHelper.java v6 · Sprint 0  
 > Responsable: González Posadas Brayan (Backend Developer)
 
 ---
@@ -26,9 +26,9 @@
 │   usuarios   │       │       animales        │
 │──────────────│       │──────────────────────│
 │ id (PK)      │       │ arete (PK, 10 dígitos)│
-│ pin_hash     │       │ nombre               │
-│ rol          │       │ raza                 │
-│ creado_en    │       │ sexo (M/H)           │
+│ nombre       │       │ nombre               │
+│ pin          │       │ raza                 │
+│ rol          │       │ sexo (M/H)           │
 └──────────────┘       │ fecha_nacimiento     │
                        │ peso_inicial         │
                        │ estado               │
@@ -69,10 +69,13 @@
 ```sql
 CREATE TABLE IF NOT EXISTS usuarios (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    pin_hash    TEXT    NOT NULL,
+    nombre      TEXT    NOT NULL,
+    pin         TEXT    NOT NULL,
+    CHECK (length(pin) BETWEEN 4 AND 6),
+    CHECK (pin GLOB '[0-9]*'),
+    CHECK (pin NOT GLOB '*[^0-9]*'),
     rol         TEXT    NOT NULL DEFAULT 'USUARIO'
-                        CHECK (rol IN ('ADMIN', 'USUARIO')),
-    creado_en   INTEGER NOT NULL  -- Unix timestamp (ms)
+                        CHECK (rol IN ('ADMIN', 'USUARIO'))
 );
 ```
 
@@ -225,7 +228,7 @@ public long insertAnimal(ReadableMap data) {
 | **RD001** — Arete SINIIGA: 10 dígitos exactos | `CHECK` en SQLite + validación en DAO antes de insert |
 | **RD002** — Sexo: solo `'M'` o `'H'` | `CHECK (sexo IN ('M', 'H'))` en DDL |
 | **RD003** — Monto gasto ≥ 0 | `CHECK (monto >= 0)` en DDL |
-| **RD004** — PIN: 4–6 dígitos numéricos | Validación en `UsuarioDAO` antes de guardar hash |
+| **RD004** — PIN de 4 a 6 dígitos numéricos | Validado en `UsuarioDAO` y en `CHECK` de SQLite |
 
 ---
 
@@ -236,7 +239,7 @@ public long insertAnimal(ReadableMap data) {
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME    = "agroapp.db";
-    private static final int    DB_VERSION = 4;
+    private static final int    DB_VERSION = 6;
     private static DatabaseHelper instance;
 
     // Patrón Singleton — una sola instancia por proceso
@@ -270,7 +273,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Migraciones incrementales por versión
+        // Migraciones incrementales por versión.
+        // La v6 agrega PIN numérico (4-6 dígitos) en usuarios.
     }
 }
 ```

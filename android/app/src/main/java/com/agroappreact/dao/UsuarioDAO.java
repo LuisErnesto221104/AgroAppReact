@@ -3,9 +3,6 @@ package com.example.agroappreact.dao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import com.example.agroapp.database.DatabaseHelper;
-import com.example.agroapp.models.Usuario;
-import com.example.agroapp.models.Usuario.TipoUsuario;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,44 +14,34 @@ public class UsuarioDAO {
     public UsuarioDAO(DatabaseHelper dbHelper) {
         this.dbHelper = dbHelper;
     }
-    
-    public Usuario validarUsuario(String username, String password) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Usuario usuario = null;
-        
-        Cursor cursor = db.query(
-            DatabaseHelper.TABLE_USUARIOS,
-            null,
-            DatabaseHelper.COL_USUARIO_USERNAME + "=? AND " + DatabaseHelper.COL_USUARIO_PASSWORD + "=?",
-            new String[]{username, password},
-            null, null, null
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            usuario = cursorToUsuario(cursor);
-            cursor.close();
-        }
-        
-        return usuario;
+
+    // Regla de negocio: PIN de 4 a 6 dígitos numéricos.
+    private boolean esPinValido(String pin) {
+        return pin != null && pin.matches("^[0-9]{4,6}$");
     }
-    
-    public Usuario obtenerPorUsername(String username) {
+
+    public Usuario validarPorPin(String pin) {
+        if (!esPinValido(pin)) {
+            return null;
+        }
+
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         Usuario usuario = null;
-        
+
         Cursor cursor = db.query(
             DatabaseHelper.TABLE_USUARIOS,
             null,
-            DatabaseHelper.COL_USUARIO_USERNAME + "=?",
-            new String[]{username},
-            null, null, null
+            DatabaseHelper.COL_USUARIO_PIN + "=?",
+            new String[]{pin},
+            null, null, null,
+            "1"
         );
-        
+
         if (cursor != null && cursor.moveToFirst()) {
             usuario = cursorToUsuario(cursor);
             cursor.close();
         }
-        
+
         return usuario;
     }
     
@@ -104,16 +91,19 @@ public class UsuarioDAO {
             return -1; // No se puede crear más usuarios
         }
         
-        // El usuario creado siempre será tipo USUARIO
-        // El admin ya existe por defecto en el sistema
-        usuario.setRol(TipoUsuario.USUARIO);
+        // El usuario creado siempre será tipo USUARIO.
+        // Ya no se guardan credenciales en la tabla usuarios.
+        usuario.setRol(Usuario.TipoUsuario.USUARIO);
+
+        if (!esPinValido(usuario.getPin())) {
+            return -1; // PIN inválido
+        }
         
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         
-        values.put(DatabaseHelper.COL_USUARIO_USERNAME, usuario.getUsername());
-        values.put(DatabaseHelper.COL_USUARIO_PASSWORD, usuario.getPassword());
         values.put(DatabaseHelper.COL_USUARIO_NOMBRE, usuario.getNombre());
+        values.put(DatabaseHelper.COL_USUARIO_PIN, usuario.getPin());
         values.put(DatabaseHelper.COL_USUARIO_ROL, usuario.getRol().name());
         
         return db.insert(DatabaseHelper.TABLE_USUARIOS, null, values);
@@ -124,12 +114,15 @@ public class UsuarioDAO {
     }
     
     public int actualizarUsuario(Usuario usuario) {
+        if (!esPinValido(usuario.getPin())) {
+            return 0; // PIN inválido
+        }
+
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         
-        values.put(DatabaseHelper.COL_USUARIO_USERNAME, usuario.getUsername());
-        values.put(DatabaseHelper.COL_USUARIO_PASSWORD, usuario.getPassword());
         values.put(DatabaseHelper.COL_USUARIO_NOMBRE, usuario.getNombre());
+        values.put(DatabaseHelper.COL_USUARIO_PIN, usuario.getPin());
         values.put(DatabaseHelper.COL_USUARIO_ROL, usuario.getRol().name());
         
         return db.update(
@@ -226,13 +219,13 @@ public class UsuarioDAO {
     
     private Usuario cursorToUsuario(Cursor cursor) {
         String rolStr = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_ROL));
-        TipoUsuario rol = TipoUsuario.valueOf(rolStr);
+        Usuario.TipoUsuario rol = Usuario.TipoUsuario.valueOf(rolStr);
+        String pin = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_PIN));
         
         return new Usuario(
             cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_ID)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_USERNAME)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_PASSWORD)),
             cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_USUARIO_NOMBRE)),
+            pin,
             rol
         );
     }

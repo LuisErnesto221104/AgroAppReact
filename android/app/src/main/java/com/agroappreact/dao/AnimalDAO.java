@@ -1,10 +1,10 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.dao;
 
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import com.example.agroapp.database.DatabaseHelper;
-import com.example.agroapp.models.Animal;
+import com.agroappreact.database.DatabaseHelper;
+import com.agroappreact.models.Animal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -110,11 +110,6 @@ public class AnimalDAO {
         return animal;
     }
     
-    /**
-     * Obtiene un animal por su número de arete (identificador visible para el usuario)
-     * @param arete Número de arete SINIGA de 10 dígitos
-     * @return Animal encontrado o null si no existe
-     */
     public Animal obtenerAnimalPorArete(String arete) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         Animal animal = null;
@@ -135,11 +130,6 @@ public class AnimalDAO {
         return animal;
     }
     
-    /**
-     * Obtiene el ID interno de un animal dado su arete
-     * @param arete Número de arete SINIGA
-     * @return ID interno del animal o -1 si no existe
-     */
     public int obtenerIdPorArete(String arete) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         int id = -1;
@@ -160,11 +150,6 @@ public class AnimalDAO {
         return id;
     }
     
-    /**
-     * Elimina un animal por su número de arete
-     * @param arete Número de arete SINIGA
-     * @return Número de filas afectadas
-     */
     public int eliminarAnimalPorArete(String arete) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         return db.delete(DatabaseHelper.TABLE_ANIMALES,
@@ -192,7 +177,6 @@ public class AnimalDAO {
         return animales;
     }
     
-    // Alias para obtenerTodosLosAnimales
     public List<Animal> obtenerTodos() {
         return obtenerTodosLosAnimales();
     }
@@ -236,7 +220,6 @@ public class AnimalDAO {
         animal.setEstado(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ANIMAL_ESTADO)));
         animal.setObservaciones(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ANIMAL_OBSERVACIONES)));
         
-        // Campos de peso (pueden ser NULL en registros antiguos)
         int pesoNacerIndex = cursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PESO_NACER);
         int pesoActualIndex = cursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PESO_ACTUAL);
         if (pesoNacerIndex != -1 && !cursor.isNull(pesoNacerIndex)) {

@@ -1,4 +1,4 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.models;
 
 public class Gasto {
     private int id;

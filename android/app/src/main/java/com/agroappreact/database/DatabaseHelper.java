@@ -1,4 +1,4 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.database;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
@@ -97,7 +97,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Crear tabla Usuarios
-        // La app usa PIN numérico de 4 a 6 dígitos para iniciar sesión.
         String createUsuarios = "CREATE TABLE " + TABLE_USUARIOS + " (" +
                 COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COL_USUARIO_NOMBRE + " TEXT NOT NULL, " +
@@ -186,8 +185,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
         db.execSQL(createAlimentacion);
         
-        // Usuario administrador por defecto del sistema
-        // PIN inicial de admin: 1234 (se recomienda forzar cambio en el flujo de app).
+        // Usuario administrador por defecto
         db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" +
             COL_USUARIO_NOMBRE + ", " + COL_USUARIO_PIN + ", " + COL_USUARIO_ROL +
             ") VALUES ('Administrador', '1234', 'ADMIN')");
@@ -196,23 +194,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) {
-            // Migración de versión 1 a 2: agregar columna raza a calendario_sanitario y gastos
             db.execSQL("ALTER TABLE " + TABLE_CALENDARIO_SANITARIO + " ADD COLUMN " + COL_CALENDARIO_RAZA + " TEXT");
             db.execSQL("ALTER TABLE " + TABLE_GASTOS + " ADD COLUMN " + COL_GASTO_RAZA + " TEXT");
         }
         if (oldVersion < 3) {
-            // Migración de versión 2 a 3: agregar columnas de peso a animales
             db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_PESO_NACER + " REAL");
             db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_PESO_ACTUAL + " REAL");
         }
         if (oldVersion < 4) {
-            // Migración de versión 3 a 4: agregar columna rol a usuarios
             db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " ADD COLUMN " + COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO'");
-            // Actualizar el usuario admin existente con rol ADMIN
             db.execSQL("UPDATE " + TABLE_USUARIOS + " SET " + COL_USUARIO_ROL + " = 'ADMIN' WHERE " + COL_USUARIO_NOMBRE + " = 'Administrador'");
         }
         if (oldVersion < 5) {
-            // Migración de versión 4 a 5: eliminar usuario/contraseña del esquema.
             db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " RENAME TO usuarios_old");
             db.execSQL("CREATE TABLE " + TABLE_USUARIOS + " (" +
                     COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -223,9 +216,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.execSQL("DROP TABLE usuarios_old");
         }
         if (oldVersion < 6) {
-            // Migración de versión 5 a 6: agregar PIN numérico para inicio de sesión.
             db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " ADD COLUMN " + COL_USUARIO_PIN + " TEXT NOT NULL DEFAULT '1234'");
-            // Normalizar datos heredados para mantener regla 4-6 dígitos.
             db.execSQL("UPDATE " + TABLE_USUARIOS + " SET " + COL_USUARIO_PIN + " = '1234' " +
                 "WHERE " + COL_USUARIO_PIN + " IS NULL OR length(" + COL_USUARIO_PIN + ") < 4 " +
                 "OR length(" + COL_USUARIO_PIN + ") > 6 " +

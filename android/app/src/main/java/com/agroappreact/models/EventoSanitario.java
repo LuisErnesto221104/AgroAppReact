@@ -1,4 +1,4 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.models;
 
 import java.util.Date;
 

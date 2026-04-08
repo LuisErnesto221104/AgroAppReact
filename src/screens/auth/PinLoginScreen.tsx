@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, SafeAreaView, StatusBar, Text, View } from 'react-native';
+import { Image, Pressable, SafeAreaView, StatusBar, Text, View } from 'react-native';
 
 import { AUTH_COLOR, authStyles, PIN_KEY_ROWS } from './authStyles';
 
@@ -24,11 +24,17 @@ export function PinLoginScreen({
     <SafeAreaView style={authStyles.loginSafeArea}>
       <StatusBar barStyle="light-content" backgroundColor={AUTH_COLOR.primary} />
       <View style={authStyles.loginContainer}>
-        <View style={authStyles.logoBadgeDark}>
-          <Text style={[authStyles.logoBadgeText, authStyles.logoBadgeTextDark]}>A</Text>
-        </View>
+        <Image
+          source={require('../../Logos/Logo_Blanco_Solo.png')}
+          style={authStyles.loginLogoIcon}
+          resizeMode="contain"
+        />
+        <Image
+          source={require('../../Logos/Nombre_Blanco.png')}
+          style={authStyles.loginLogoText}
+          resizeMode="contain"
+        />
 
-        <Text style={authStyles.loginTitle}>AgroApp</Text>
         <Text style={authStyles.loginSubtitle}>Ingrese su PIN</Text>
         <Text style={authStyles.loginUserLabel}>{primaryUserName}</Text>
 

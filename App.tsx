@@ -1,9 +1,14 @@
 import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import AuthFlow from './src/screens/auth/AuthFlow';
+import AppNavigator from './src/navigation/AppNavigator';
 
 function App() {
-  return <AuthFlow />;
+  return (
+    <SafeAreaProvider>
+      <AppNavigator />
+    </SafeAreaProvider>
+  );
 }
 
 export default App;

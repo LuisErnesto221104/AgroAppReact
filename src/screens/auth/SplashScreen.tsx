@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, SafeAreaView, StatusBar, Text, View } from 'react-native';
+import { Image, Pressable, SafeAreaView, StatusBar, Text, View } from 'react-native';
 
 import { AUTH_COLOR, authStyles } from './authStyles';
 
@@ -12,13 +12,15 @@ export function SplashScreen({ onContinue }: SplashScreenProps) {
     <SafeAreaView style={authStyles.splashSafeArea}>
       <StatusBar barStyle="light-content" backgroundColor={AUTH_COLOR.primary} />
       <View style={authStyles.splashContainer}>
-        <View style={authStyles.logoBadgeLight}>
-          <Text style={authStyles.logoBadgeText}>A</Text>
-        </View>
+        <Image
+          source={require('../../Logos/Logo_Blanco_Nombre.png')}
+          style={authStyles.splashLogoFull}
+          resizeMode="contain"
+        />
 
         <Text style={authStyles.splashTitle}>AgroApp</Text>
         <Text style={authStyles.splashSubtitle}>Gestion Ganadera Offline</Text>
-        <Text style={authStyles.splashBody}>Bienvenido. Cree su PIN de seguridad de 4 digitos</Text>
+        <Text style={authStyles.splashBody}>Cree su PIN de seguridad de 4 digitos</Text>
 
         <View style={authStyles.progressRow}>
           {[0, 1, 2, 3].map(step => (

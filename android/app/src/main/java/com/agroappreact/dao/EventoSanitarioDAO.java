@@ -1,10 +1,10 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.dao;
 
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import com.example.agroapp.database.DatabaseHelper;
-import com.example.agroapp.models.EventoSanitario;
+import com.agroappreact.database.DatabaseHelper;
+import com.agroappreact.models.EventoSanitario;
 import java.util.ArrayList;
 import java.util.List;
 

@@ -1,8 +1,10 @@
-package com.example.agroappreact.dao;
+package com.agroappreact.dao;
 
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import com.agroappreact.database.DatabaseHelper;
+import com.agroappreact.models.Usuario;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +17,6 @@ public class UsuarioDAO {
         this.dbHelper = dbHelper;
     }
 
-    // Regla de negocio: PIN de 4 a 6 dígitos numéricos.
     private boolean esPinValido(String pin) {
         return pin != null && pin.matches("^[0-9]{4,6}$");
     }
@@ -86,17 +87,14 @@ public class UsuarioDAO {
     }
     
     public long insertarUsuario(Usuario usuario) {
-        // Verificar que no se exceda el límite de usuarios (1 admin + 1 usuario)
         if (!puedeCrearUsuario()) {
-            return -1; // No se puede crear más usuarios
+            return -1;
         }
         
-        // El usuario creado siempre será tipo USUARIO.
-        // Ya no se guardan credenciales en la tabla usuarios.
         usuario.setRol(Usuario.TipoUsuario.USUARIO);
 
         if (!esPinValido(usuario.getPin())) {
-            return -1; // PIN inválido
+            return -1;
         }
         
         SQLiteDatabase db = dbHelper.getWritableDatabase();
@@ -115,7 +113,7 @@ public class UsuarioDAO {
     
     public int actualizarUsuario(Usuario usuario) {
         if (!esPinValido(usuario.getPin())) {
-            return 0; // PIN inválido
+            return 0;
         }
 
         SQLiteDatabase db = dbHelper.getWritableDatabase();
@@ -134,10 +132,9 @@ public class UsuarioDAO {
     }
     
     public int eliminarUsuario(int id) {
-        // No permitir eliminar al admin
         Usuario usuario = obtenerPorId(id);
         if (usuario != null && usuario.esAdmin()) {
-            return 0; // No se puede eliminar al admin
+            return 0;
         }
         
         SQLiteDatabase db = dbHelper.getWritableDatabase();
@@ -204,7 +201,7 @@ public class UsuarioDAO {
         Cursor cursor = db.query(
             DatabaseHelper.TABLE_USUARIOS,
             null, null, null, null, null,
-            DatabaseHelper.COL_USUARIO_ROL + " ASC" // Admin primero
+            DatabaseHelper.COL_USUARIO_ROL + " ASC"
         );
         
         if (cursor != null && cursor.moveToFirst()) {

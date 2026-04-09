@@ -196,6 +196,18 @@ export const authStyles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FONTS.semiBold,
   },
+  infoPill: {
+    marginTop: 16,
+    borderRadius: 999,
+    backgroundColor: '#e8f2ff',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  infoText: {
+    color: '#1b4b9a',
+    fontSize: 13,
+    fontFamily: FONTS.semiBold,
+  },
   keypad: {
     marginTop: 20,
     width: '100%',

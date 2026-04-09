@@ -1,37 +1,50 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
-import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { iniciarSesionPrincipal, obtenerEstadoAuth } from '../../native/AuthModule';
+import { consumeSessionLockReason, shouldShowAuthIntroOnEntry } from '../../shared/services/sessionManager';
 import { LoadingScreen } from './LoadingScreen';
 import { PIN_MAX, PIN_MIN } from './authStyles';
 import { PinLoginScreen } from './PinLoginScreen';
 import { SplashScreen } from './SplashScreen';
-import { HomeModuleRoute } from '../../features/home/types/homeNavigation';
 
-type ScreenMode = 'splash' | 'login' | 'authenticated';
+type ScreenMode = 'splash' | 'login';
 
 type AuthFlowProps = {
-  onAuthenticated?: () => void;
+  onAuthenticated?: () => void | Promise<void>;
 };
 
 export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
-  const [mode, setMode] = useState<ScreenMode>('splash');
+  const [mode, setMode] = useState<ScreenMode>('login');
   const [loading, setLoading] = useState(true);
   const [primaryUserName, setPrimaryUserName] = useState('Administrador');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
 
   useEffect(() => {
     // Carga del estado local de autenticacion para mantener flujo completamente offline.
     const loadAuthState = async () => {
       try {
-        const status = await obtenerEstadoAuth();
+        const [status, lockReason] = await Promise.all([
+          obtenerEstadoAuth(),
+          consumeSessionLockReason(),
+        ]);
         if (status.primaryUserName) {
           setPrimaryUserName(status.primaryUserName);
         }
+
+        if (lockReason === 'timeout') {
+          setInfoMessage('Sesion cerrada por inactividad. Ingrese su PIN para continuar.');
+          setMode('login');
+          return;
+        }
+
+        const mustShowIntro = await shouldShowAuthIntroOnEntry();
+        setMode(mustShowIntro ? 'splash' : 'login');
       } catch {
         // Si no se puede leer estado, mantenemos defaults para no bloquear la vista.
+        setMode('login');
       } finally {
         setLoading(false);
       }
@@ -46,6 +59,7 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
 
   const onPressDigit = (digit: string) => {
     setError('');
+    setInfoMessage('');
     setPin(current => {
       if (current.length >= PIN_MAX) {
         return current;
@@ -56,6 +70,7 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
 
   const onPressDelete = () => {
     setError('');
+    setInfoMessage('');
     setPin(current => current.slice(0, -1));
   };
 
@@ -69,9 +84,8 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
       const session = await iniciarSesionPrincipal(pin);
       setError('');
       setPin('');
-      setMode('authenticated');
       Alert.alert('Acceso permitido', `Bienvenido ${session.name}.`);
-      onAuthenticated?.();
+      await onAuthenticated?.();
     } catch (nativeError: any) {
       const message = nativeError?.message ?? 'PIN incorrecto. Intente de nuevo.';
       setError(message);
@@ -93,6 +107,7 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
         primaryUserName={primaryUserName}
         pinIndicators={pinIndicators}
         error={error}
+        infoMessage={infoMessage}
         onPressDigit={onPressDigit}
         onPressDelete={onPressDelete}
         onSubmitPin={onSubmitPin}
@@ -100,8 +115,5 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
     );
   }
 
-  // Si el navigator no recibe callback (modo standalone), hacemos fallback local a Home.
-  return <HomeScreen onOpenModule={function (target: HomeModuleRoute): void {
-    throw new Error('Function not implemented.');
-  } } />;
+  return <LoadingScreen />;
 }

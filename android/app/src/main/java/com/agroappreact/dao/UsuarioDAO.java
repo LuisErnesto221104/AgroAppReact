@@ -3,6 +3,8 @@ package com.agroappreact.dao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.text.TextUtils;
+
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.Usuario;
 
@@ -17,12 +19,8 @@ public class UsuarioDAO {
         this.dbHelper = dbHelper;
     }
 
-    private boolean esPinValido(String pin) {
-        return pin != null && pin.matches("^[0-9]{4,6}$");
-    }
-
-    public Usuario validarPorPin(String pin) {
-        if (!esPinValido(pin)) {
+    public Usuario validarPorPin(String pinHash) {
+        if (TextUtils.isEmpty(pinHash)) {
             return null;
         }
 
@@ -33,7 +31,57 @@ public class UsuarioDAO {
             DatabaseHelper.TABLE_USUARIOS,
             null,
             DatabaseHelper.COL_USUARIO_PIN + "=?",
-            new String[]{pin},
+            new String[]{pinHash},
+            null, null, null,
+            "1"
+        );
+
+        if (cursor != null && cursor.moveToFirst()) {
+            usuario = cursorToUsuario(cursor);
+            cursor.close();
+        }
+
+        return usuario;
+    }
+
+    public Usuario validarCredenciales(String nombre, String pinHash) {
+        if (TextUtils.isEmpty(nombre) || TextUtils.isEmpty(pinHash)) {
+            return null;
+        }
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Usuario usuario = null;
+
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_USUARIOS,
+            null,
+            DatabaseHelper.COL_USUARIO_NOMBRE + "=? AND " + DatabaseHelper.COL_USUARIO_PIN + "=?",
+            new String[]{nombre.trim(), pinHash},
+            null, null, null,
+            "1"
+        );
+
+        if (cursor != null && cursor.moveToFirst()) {
+            usuario = cursorToUsuario(cursor);
+            cursor.close();
+        }
+
+        return usuario;
+    }
+
+    public Usuario obtenerPorNombre(String nombre) {
+        if (TextUtils.isEmpty(nombre)) {
+            return null;
+        }
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Usuario usuario = null;
+
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_USUARIOS,
+            null,
+            DatabaseHelper.COL_USUARIO_NOMBRE + "=?",
+            new String[]{nombre.trim()},
             null, null, null,
             "1"
         );
@@ -93,10 +141,6 @@ public class UsuarioDAO {
         
         usuario.setRol(Usuario.TipoUsuario.USUARIO);
 
-        if (!esPinValido(usuario.getPin())) {
-            return -1;
-        }
-        
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         
@@ -112,10 +156,6 @@ public class UsuarioDAO {
     }
     
     public int actualizarUsuario(Usuario usuario) {
-        if (!esPinValido(usuario.getPin())) {
-            return 0;
-        }
-
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         

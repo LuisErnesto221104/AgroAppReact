@@ -16,6 +16,7 @@ public class AgroAppPackage implements ReactPackage {
         List<NativeModule> modules = new ArrayList<>();
         // Registramos el módulo que expone métodos Java al lado JS.
         modules.add(new AgroBridgeModule(reactContext));
+        modules.add(new AuthModule(reactContext));
         return modules;
     }
 

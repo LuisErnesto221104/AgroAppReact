@@ -1,13 +1,22 @@
 package com.agroappreact.database;
 
+import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.text.TextUtils;
+
+import com.agroappreact.security.PinSecurity;
+
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -99,11 +108,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         // Crear tabla Usuarios
         String createUsuarios = "CREATE TABLE " + TABLE_USUARIOS + " (" +
                 COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                COL_USUARIO_NOMBRE + " TEXT NOT NULL, " +
+                COL_USUARIO_NOMBRE + " TEXT NOT NULL UNIQUE, " +
             COL_USUARIO_PIN + " TEXT NOT NULL, " +
-            "CHECK (length(" + COL_USUARIO_PIN + ") BETWEEN 4 AND 6), " +
-            "CHECK (" + COL_USUARIO_PIN + " GLOB '[0-9]*'), " +
-            "CHECK (" + COL_USUARIO_PIN + " NOT GLOB '*[^0-9]*'), " +
                 COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO')";
         db.execSQL(createUsuarios);
         
@@ -185,10 +191,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
         db.execSQL(createAlimentacion);
         
-        // Usuario administrador por defecto
-        db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" +
-            COL_USUARIO_NOMBRE + ", " + COL_USUARIO_PIN + ", " + COL_USUARIO_ROL +
-            ") VALUES ('Administrador', '1234', 'ADMIN')");
+        // Usuario administrador por defecto con PIN hasheado (nunca texto plano).
+        try {
+            String adminHash = PinSecurity.hashPin("1234");
+            db.execSQL("INSERT INTO " + TABLE_USUARIOS + " (" +
+                COL_USUARIO_NOMBRE + ", " + COL_USUARIO_PIN + ", " + COL_USUARIO_ROL +
+                ") VALUES ('Administrador', '" + adminHash + "', 'ADMIN')");
+        } catch (Exception ignored) {
+            // Si falla el hash por una causa inesperada, evitamos bloquear la creación de BD.
+        }
     }
     
     @Override
@@ -222,11 +233,118 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 "OR length(" + COL_USUARIO_PIN + ") > 6 " +
                 "OR " + COL_USUARIO_PIN + " GLOB '*[^0-9]*'");
         }
+        if (oldVersion < 7) {
+            migrarUsuariosV7(db);
+        }
     }
     
     @Override
     public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
         db.setForeignKeyConstraintsEnabled(true);
+    }
+
+    private void migrarUsuariosV7(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE " + TABLE_USUARIOS + " RENAME TO usuarios_v6_backup");
+
+        db.execSQL("CREATE TABLE " + TABLE_USUARIOS + " (" +
+                COL_USUARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_USUARIO_NOMBRE + " TEXT NOT NULL UNIQUE, " +
+                COL_USUARIO_PIN + " TEXT NOT NULL, " +
+                COL_USUARIO_ROL + " TEXT NOT NULL DEFAULT 'USUARIO')");
+
+        Cursor cursor = db.query(
+                "usuarios_v6_backup",
+                new String[]{COL_USUARIO_ID, COL_USUARIO_NOMBRE, COL_USUARIO_PIN, COL_USUARIO_ROL},
+                null,
+                null,
+                null,
+                null,
+                COL_USUARIO_ID + " ASC"
+        );
+
+        Set<String> nombresNormalizados = new HashSet<>();
+
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    int id = cursor.getInt(cursor.getColumnIndexOrThrow(COL_USUARIO_ID));
+                    String nombre = cursor.getString(cursor.getColumnIndexOrThrow(COL_USUARIO_NOMBRE));
+                    String pin = cursor.getString(cursor.getColumnIndexOrThrow(COL_USUARIO_PIN));
+                    String rol = cursor.getString(cursor.getColumnIndexOrThrow(COL_USUARIO_ROL));
+
+                    String nombreSeguro = normalizarNombreParaMigracion(nombre, id, nombresNormalizados);
+                    String pinSeguro = convertirPinAHash(pin);
+                    String rolSeguro = TextUtils.isEmpty(rol) ? "USUARIO" : rol;
+
+                    ContentValues values = new ContentValues();
+                    values.put(COL_USUARIO_ID, id);
+                    values.put(COL_USUARIO_NOMBRE, nombreSeguro);
+                    values.put(COL_USUARIO_PIN, pinSeguro);
+                    values.put(COL_USUARIO_ROL, rolSeguro);
+
+                    db.insert(TABLE_USUARIOS, null, values);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        db.execSQL("DROP TABLE usuarios_v6_backup");
+
+        Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_USUARIOS, null);
+        int count = 0;
+        if (countCursor != null) {
+            try {
+                if (countCursor.moveToFirst()) {
+                    count = countCursor.getInt(0);
+                }
+            } finally {
+                countCursor.close();
+            }
+        }
+
+        if (count == 0) {
+            try {
+                ContentValues adminValues = new ContentValues();
+                adminValues.put(COL_USUARIO_NOMBRE, "Administrador");
+                adminValues.put(COL_USUARIO_PIN, PinSecurity.hashPin("1234"));
+                adminValues.put(COL_USUARIO_ROL, "ADMIN");
+                db.insert(TABLE_USUARIOS, null, adminValues);
+            } catch (Exception ignored) {
+                // Evita fallo duro de migración en un caso inesperado.
+            }
+        }
+    }
+
+    private String normalizarNombreParaMigracion(String nombre, int id, Set<String> usados) {
+        String base = TextUtils.isEmpty(nombre) ? "Usuario" : nombre.trim();
+        if (base.isEmpty()) {
+            base = "Usuario";
+        }
+
+        String candidato = base;
+        int intento = 0;
+        while (usados.contains(candidato.toLowerCase(Locale.ROOT))) {
+            intento++;
+            candidato = base + "_" + id + (intento > 1 ? "_" + intento : "");
+        }
+
+        usados.add(candidato.toLowerCase(Locale.ROOT));
+        return candidato;
+    }
+
+    private String convertirPinAHash(String pin) {
+        try {
+            if (PinSecurity.looksHashed(pin)) {
+                return pin.toLowerCase(Locale.ROOT);
+            }
+            if (PinSecurity.isPinFormatValid(pin)) {
+                return PinSecurity.hashPin(pin);
+            }
+            return PinSecurity.hashPin("1234");
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

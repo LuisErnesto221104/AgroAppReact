@@ -38,11 +38,14 @@ public class AuthModule extends ReactContextBaseJavaModule {
     public void getAuthStatus(Promise promise) {
         executorService.execute(() -> {
             try {
-                Usuario admin = usuarioDAO.obtenerAdmin();
-                Usuario principal = admin != null ? admin : usuarioDAO.obtenerUsuarioNormal();
+                Usuario principal = usuarioDAO.obtenerUsuarioNormal();
+                if (principal == null) {
+                    principal = usuarioDAO.obtenerAdmin();
+                }
 
                 WritableMap result = Arguments.createMap();
-                result.putBoolean("hasUsers", usuarioDAO.existeAlgunUsuario());
+                // Para el flujo de bootstrap en app, consideramos usuario real al no-admin.
+                result.putBoolean("hasUsers", usuarioDAO.existeUsuarioNormal());
                 result.putString("primaryUserName", principal != null ? principal.getNombre() : "");
                 result.putBoolean("isAdminPrimary", principal != null && principal.esAdmin());
 
@@ -57,31 +60,25 @@ public class AuthModule extends ReactContextBaseJavaModule {
     public void loginPrimaryUser(String pin, Promise promise) {
         executorService.execute(() -> {
             try {
-                // Flujo del prototipo: login por PIN para el usuario principal (admin o primer usuario).
-                Usuario principal = usuarioDAO.obtenerAdmin();
-                if (principal == null) {
-                    principal = usuarioDAO.obtenerUsuarioNormal();
-                }
-
-                if (principal == null) {
+                if (!usuarioDAO.existeAlgunUsuario()) {
                     promise.reject("AUTH_NO_USERS", "No hay usuarios registrados en el dispositivo.");
                     return;
                 }
 
                 validarPin(pin);
                 String hash = PinSecurity.hashPin(pin);
-                boolean ok = hash.equals(principal.getPin());
+                Usuario usuario = usuarioDAO.validarPorPin(hash);
 
-                if (!ok) {
+                if (usuario == null) {
                     promise.reject("AUTH_INVALID_PIN", "PIN incorrecto. Intente de nuevo.");
                     return;
                 }
 
                 WritableMap result = Arguments.createMap();
                 result.putBoolean("ok", true);
-                result.putInt("userId", principal.getId());
-                result.putString("name", principal.getNombre());
-                result.putString("role", principal.getRol().name());
+                result.putInt("userId", usuario.getId());
+                result.putString("name", usuario.getNombre());
+                result.putString("role", usuario.getRol().name());
                 promise.resolve(result);
             } catch (IllegalArgumentException e) {
                 promise.reject("AUTH_VALIDATION_ERROR", e.getMessage());

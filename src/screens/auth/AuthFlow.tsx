@@ -1,16 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { iniciarSesionPrincipal, obtenerEstadoAuth } from '../../native/AuthModule';
-import { AuthenticatedScreen } from './AuthenticatedScreen';
 import { LoadingScreen } from './LoadingScreen';
 import { PIN_MAX, PIN_MIN } from './authStyles';
 import { PinLoginScreen } from './PinLoginScreen';
 import { SplashScreen } from './SplashScreen';
+import { HomeModuleRoute } from '../../features/home/types/homeNavigation';
 
 type ScreenMode = 'splash' | 'login' | 'authenticated';
 
-export default function AuthFlow() {
+type AuthFlowProps = {
+  onAuthenticated?: () => void;
+};
+
+export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
   const [mode, setMode] = useState<ScreenMode>('splash');
   const [loading, setLoading] = useState(true);
   const [primaryUserName, setPrimaryUserName] = useState('Administrador');
@@ -66,6 +71,7 @@ export default function AuthFlow() {
       setPin('');
       setMode('authenticated');
       Alert.alert('Acceso permitido', `Bienvenido ${session.name}.`);
+      onAuthenticated?.();
     } catch (nativeError: any) {
       const message = nativeError?.message ?? 'PIN incorrecto. Intente de nuevo.';
       setError(message);
@@ -94,5 +100,8 @@ export default function AuthFlow() {
     );
   }
 
-  return <AuthenticatedScreen onBackToLogin={() => setMode('login')} />;
+  // Si el navigator no recibe callback (modo standalone), hacemos fallback local a Home.
+  return <HomeScreen onOpenModule={function (target: HomeModuleRoute): void {
+    throw new Error('Function not implemented.');
+  } } />;
 }

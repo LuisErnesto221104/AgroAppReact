@@ -1,11 +1,12 @@
 import { StyleSheet } from 'react-native';
+import { COLORS, FONTS } from '../../shared/theme/identity';
 
 export const AUTH_COLOR = {
-  primary: '#07612d',
-  white: '#ffffff',
-  textOnLight: '#1d1d1b',
-  secondaryText: '#98a287',
-  error: '#D32F2F',
+  primary: COLORS.primary,
+  white: COLORS.white,
+  textOnLight: COLORS.black,
+  secondaryText: COLORS.gray,
+  error: COLORS.error,
   keyOverlay: 'rgba(255, 255, 255, 0.18)',
   keyBorder: 'rgba(255, 255, 255, 0.85)',
 };
@@ -35,7 +36,7 @@ export const authStyles = StyleSheet.create({
   },
   splashSafeArea: {
     flex: 1,
-    backgroundColor: AUTH_COLOR.white,
+    backgroundColor: AUTH_COLOR.primary,
   },
   splashContainer: {
     flex: 1,
@@ -51,6 +52,11 @@ export const authStyles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: AUTH_COLOR.primary,
     marginBottom: 12,
+  },
+  splashLogoFull: {
+    width: 210,
+    height: 106,
+    marginBottom: 14,
   },
   logoBadgeDark: {
     width: 82,
@@ -70,24 +76,25 @@ export const authStyles = StyleSheet.create({
     color: AUTH_COLOR.primary,
   },
   splashTitle: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: AUTH_COLOR.primary,
+    fontSize: 32,
+    fontFamily: FONTS.bold,
+    color: AUTH_COLOR.white,
   },
   splashSubtitle: {
     marginTop: 2,
-    fontSize: 17,
-    color: AUTH_COLOR.secondaryText,
+    fontSize: 14,
+    fontFamily: FONTS.regular,
+    color: AUTH_COLOR.white,
     textAlign: 'center',
   },
   splashBody: {
     marginTop: 20,
     maxWidth: 290,
     textAlign: 'center',
-    fontSize: 22,
-    lineHeight: 31,
-    color: AUTH_COLOR.textOnLight,
-    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 22,
+    color: AUTH_COLOR.white,
+    fontFamily: FONTS.semiBold,
   },
   progressRow: {
     marginTop: 24,
@@ -113,14 +120,15 @@ export const authStyles = StyleSheet.create({
   },
   primaryButtonText: {
     color: AUTH_COLOR.white,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: FONTS.bold,
   },
   footerTextLight: {
     position: 'absolute',
     bottom: 24,
     fontSize: 12,
-    color: '#b5b5b5',
+    fontFamily: FONTS.light,
+    color: '#d8ead9',
   },
   loginSafeArea: {
     flex: 1,
@@ -130,7 +138,16 @@ export const authStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingTop: 28,
+    paddingTop: 22,
+  },
+  loginLogoIcon: {
+    width: 74,
+    height: 74,
+  },
+  loginLogoText: {
+    width: 176,
+    height: 52,
+    marginTop: 4,
   },
   loginTitle: {
     marginTop: 6,
@@ -140,13 +157,14 @@ export const authStyles = StyleSheet.create({
   },
   loginSubtitle: {
     marginTop: 2,
-    fontSize: 22,
+    fontSize: 18,
+    fontFamily: FONTS.semiBold,
     color: '#e7f6eb',
-    fontWeight: '500',
   },
   loginUserLabel: {
     marginTop: 4,
     fontSize: 13,
+    fontFamily: FONTS.regular,
     color: '#d7eddc',
   },
   indicatorRow: {
@@ -175,8 +193,8 @@ export const authStyles = StyleSheet.create({
   },
   errorText: {
     color: AUTH_COLOR.error,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    fontFamily: FONTS.semiBold,
   },
   keypad: {
     marginTop: 20,
@@ -222,12 +240,13 @@ export const authStyles = StyleSheet.create({
   submitButtonText: {
     color: AUTH_COLOR.primary,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FONTS.bold,
   },
   footerTextDark: {
     position: 'absolute',
     bottom: 20,
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: FONTS.light,
     color: '#d8ead9',
     textDecorationLine: 'underline',
   },

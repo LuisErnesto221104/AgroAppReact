@@ -5,6 +5,8 @@ import { AUTH_COLOR, authStyles, PIN_KEY_ROWS } from './authStyles';
 
 type PinLoginScreenProps = {
   primaryUserName: string;
+  subtitle?: string;
+  submitLabel?: string;
   pinIndicators: boolean[];
   error: string;
   infoMessage?: string;
@@ -15,6 +17,8 @@ type PinLoginScreenProps = {
 
 export function PinLoginScreen({
   primaryUserName,
+  subtitle = 'Ingrese su PIN',
+  submitLabel = 'Ingresar',
   pinIndicators,
   error,
   infoMessage,
@@ -37,7 +41,7 @@ export function PinLoginScreen({
           resizeMode="contain"
         />
 
-        <Text style={authStyles.loginSubtitle}>Ingrese su PIN</Text>
+        <Text style={authStyles.loginSubtitle}>{subtitle}</Text>
         <Text style={authStyles.loginUserLabel}>{primaryUserName}</Text>
 
         <View style={authStyles.indicatorRow}>
@@ -81,7 +85,7 @@ export function PinLoginScreen({
         </View>
 
         <Pressable style={authStyles.submitButton} onPress={onSubmitPin}>
-          <Text style={authStyles.submitButtonText}>Ingresar</Text>
+          <Text style={authStyles.submitButtonText}>{submitLabel}</Text>
         </Pressable>
 
         <Text style={authStyles.footerTextDark}>Olvido su PIN? Contacte al administrador</Text>

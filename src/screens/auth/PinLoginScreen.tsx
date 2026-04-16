@@ -7,6 +7,7 @@ type PinLoginScreenProps = {
   primaryUserName: string;
   pinIndicators: boolean[];
   error: string;
+  infoMessage?: string;
   onPressDigit: (digit: string) => void;
   onPressDelete: () => void;
   onSubmitPin: () => void;
@@ -16,6 +17,7 @@ export function PinLoginScreen({
   primaryUserName,
   pinIndicators,
   error,
+  infoMessage,
   onPressDigit,
   onPressDelete,
   onSubmitPin,
@@ -47,6 +49,12 @@ export function PinLoginScreen({
         {error ? (
           <View style={authStyles.errorPill}>
             <Text style={authStyles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {!error && infoMessage ? (
+          <View style={authStyles.infoPill}>
+            <Text style={authStyles.infoText}>{infoMessage}</Text>
           </View>
         ) : null}
 

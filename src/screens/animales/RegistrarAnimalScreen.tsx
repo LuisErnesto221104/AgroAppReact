@@ -12,6 +12,7 @@ import {
 
 import { AnimalModule } from '../../native/AnimalModule';
 import type { AnimalFormState, InsertAnimalPayload } from '../../types/Animal';
+import { validateArete } from '../../utils/validaciones/areteValidator';
 
 type RegistrarAnimalScreenProps = {
   onBack: () => void;
@@ -29,10 +30,12 @@ const INITIAL_FORM_STATE: AnimalFormState = {
 export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
   const [form, setForm] = useState<AnimalFormState>(INITIAL_FORM_STATE);
   const [loading, setLoading] = useState(false);
+  const [areteError, setAreteError] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => {
+    const areteValidation = validateArete(form.arete);
     return (
-      form.arete.trim().length > 0 &&
+      areteValidation.valid &&
       form.especie.trim().length > 0 &&
       form.sexo.trim().length > 0 &&
       form.fecha.trim().length > 0
@@ -41,6 +44,12 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
 
   const setField = (key: keyof AnimalFormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const onAreteChange = (value: string) => {
+    setField('arete', value);
+    const result = validateArete(value);
+    setAreteError(result.errorMsg);
   };
 
   const buildPayload = (): InsertAnimalPayload => {
@@ -60,6 +69,14 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
       return;
     }
 
+    const areteValidation = validateArete(form.arete);
+    if (!areteValidation.valid) {
+      setAreteError(areteValidation.errorMsg);
+      return;
+    }
+
+    setAreteError(null);
+
     const payload = buildPayload();
     if (payload.peso !== null && Number.isNaN(payload.peso)) {
       Alert.alert('Dato invalido', 'El peso debe ser numerico.');
@@ -71,7 +88,28 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
       await AnimalModule.insertAnimal(payload);
       Alert.alert('Registro exitoso', `Animal con arete ${payload.arete} registrado.`);
       setForm(INITIAL_FORM_STATE);
+      setAreteError(null);
     } catch (error) {
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : null;
+
+      if (errorCode === 'ERR_ARETE_EMPTY') {
+        setAreteError('El numero de arete es obligatorio.');
+        return;
+      }
+
+      if (errorCode === 'ERR_ARETE_FORMAT') {
+        setAreteError('El arete debe tener 10 digitos y no puede iniciar en 0.');
+        return;
+      }
+
+      if (errorCode === 'ERR_ARETE_DUPLICATE') {
+        setAreteError('El arete ya existe en el registro SINIIGA.');
+        return;
+      }
+
       const message = error instanceof Error ? error.message : 'No se pudo registrar el animal.';
       Alert.alert('Error de registro', message);
     } finally {
@@ -85,18 +123,20 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
         <Pressable onPress={onBack} style={styles.backButton}>
           <Text style={styles.backText}>Volver</Text>
         </Pressable>
-        <Text style={styles.title}>Registro Arete SINIIGA</Text>
+        <Text style={styles.title}>Registrar Animal</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.label}>Arete</Text>
+        <Text style={styles.label}>Numero de Arete SINIIGA *</Text>
         <TextInput
           value={form.arete}
-          onChangeText={value => setField('arete', value)}
-          placeholder="Ej. MX-0011223344"
-          style={styles.input}
-          autoCapitalize="characters"
+          onChangeText={onAreteChange}
+          placeholder="0013482956"
+          style={[styles.input, areteError ? styles.inputError : undefined]}
+          keyboardType="number-pad"
+          maxLength={10}
         />
+        {areteError ? <Text style={styles.errorText}>{areteError}</Text> : null}
 
         <Text style={styles.label}>Especie</Text>
         <TextInput
@@ -198,6 +238,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: '#1c2b1d',
+  },
+  inputError: {
+    borderColor: '#d23d3d',
+  },
+  errorText: {
+    marginTop: 6,
+    color: '#d23d3d',
+    fontSize: 12,
+    fontWeight: '600',
   },
   submitButton: {
     marginTop: 24,

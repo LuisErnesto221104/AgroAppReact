@@ -16,7 +16,7 @@ import { COLORS, FONTS } from '../../../shared/theme/identity';
 import { HomeModuleRoute } from '../types/homeNavigation';
 
 const QUICK_ACTIONS = [
-  { key: 'animal', icon: '🐄', label: 'Animal', target: 'animals' as HomeModuleRoute },
+  { key: 'animal', icon: '🐄', label: 'Gestion de animales', target: 'animals' as HomeModuleRoute },
   { key: 'salud', icon: '💉', label: 'Sanidad', target: 'health' as HomeModuleRoute },
   { key: 'gasto', icon: '💵', label: 'Gasto', target: 'costs' as HomeModuleRoute },
 ];

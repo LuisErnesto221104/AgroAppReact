@@ -4,6 +4,7 @@ import android.database.SQLException;
 import android.database.sqlite.SQLiteConstraintException;
 
 import com.agroappreact.database.DatabaseHelper;
+import com.agroappreact.utils.AreteValidator;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -16,6 +17,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class AnimalModule extends ReactContextBaseJavaModule {
+
+    private static final String ERR_ARETE_FORMAT = "ERR_ARETE_FORMAT";
+    private static final String ERR_ARETE_DUPLICATE = "ERR_ARETE_DUPLICATE";
+    private static final String ERR_ARETE_EMPTY = "ERR_ARETE_EMPTY";
 
     private final AnimalDAO animalDAO;
     private final ExecutorService executorService;
@@ -36,7 +41,18 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     public void insertAnimal(ReadableMap payload, Promise promise) {
         executorService.execute(() -> {
             try {
-                String arete = readRequiredString(payload, "arete");
+                String areteRaw = readOptionalString(payload, "arete");
+                if (areteRaw == null || areteRaw.trim().isEmpty()) {
+                    promise.reject(ERR_ARETE_EMPTY, "El numero de arete es obligatorio.");
+                    return;
+                }
+
+                String arete = areteRaw.trim();
+                if (!AreteValidator.isValid(arete)) {
+                    promise.reject(ERR_ARETE_FORMAT, "El arete debe tener 10 digitos y no puede iniciar en 0.");
+                    return;
+                }
+
                 String especie = readRequiredString(payload, "especie");
                 String sexo = readRequiredString(payload, "sexo");
                 String fecha = readRequiredString(payload, "fecha");
@@ -69,11 +85,11 @@ public class AnimalModule extends ReactContextBaseJavaModule {
             } catch (IllegalArgumentException e) {
                 promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
             } catch (SQLiteConstraintException e) {
-                promise.reject("ANIMAL_DUPLICATE_ARETE", "El arete ya existe en el registro SINIIGA.");
+                promise.reject(ERR_ARETE_DUPLICATE, "El arete ya existe en el registro SINIIGA.");
             } catch (SQLException e) {
                 String message = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
                 if (message.contains("unique") || message.contains("constraint")) {
-                    promise.reject("ANIMAL_DUPLICATE_ARETE", "El arete ya existe en el registro SINIIGA.");
+                    promise.reject(ERR_ARETE_DUPLICATE, "El arete ya existe en el registro SINIIGA.");
                     return;
                 }
                 promise.reject("ANIMAL_INSERT_ERROR", "No se pudo registrar el animal: " + e.getMessage());

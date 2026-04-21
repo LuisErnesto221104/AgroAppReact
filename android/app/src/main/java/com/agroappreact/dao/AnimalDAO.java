@@ -3,6 +3,7 @@ package com.agroappreact.dao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.Animal;
 import java.util.ArrayList;
@@ -57,6 +58,37 @@ public class AnimalDAO {
         values.put(DatabaseHelper.COL_ANIMAL_PESO_ACTUAL, animal.getPesoActual());
         
         return db.insert(DatabaseHelper.TABLE_ANIMALES, null, values);
+    }
+
+    public long insertAnimalRegistroSiniiga(
+            String arete,
+            String especie,
+            String sexo,
+            String fechaRegistro,
+            Double peso,
+            String foto
+    ) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COL_ANIMAL_ARETE, arete);
+            values.put(DatabaseHelper.COL_ANIMAL_ESPECIE, especie);
+            values.put(DatabaseHelper.COL_ANIMAL_SEXO, sexo);
+            values.put(DatabaseHelper.COL_ANIMAL_FECHA_REGISTRO, fechaRegistro);
+            if (peso != null) {
+                values.put(DatabaseHelper.COL_ANIMAL_PESO, peso);
+            }
+            values.put(DatabaseHelper.COL_ANIMAL_FOTO, foto);
+
+            long insertId = db.insertOrThrow(DatabaseHelper.TABLE_ANIMALES, null, values);
+            db.setTransactionSuccessful();
+            return insertId;
+        } catch (SQLiteException e) {
+            return -1;
+        } finally {
+            db.endTransaction();
+        }
     }
     
     public int actualizarAnimal(Animal animal) {

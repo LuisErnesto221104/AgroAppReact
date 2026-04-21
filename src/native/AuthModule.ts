@@ -24,6 +24,7 @@ type AuthNativeModule = {
   loginPrimaryUser(pin: string): Promise<AuthSession>;
   login(nombre: string, pin: string): Promise<AuthSession>;
   registerUser(nombre: string, pin: string): Promise<AuthRegisterResult>;
+  updatePrimaryUserPin(pin: string): Promise<AuthSession>;
 };
 
 const { AuthModule } = NativeModules;
@@ -53,4 +54,9 @@ export const iniciarSesion = (nombre: string, pin: string): Promise<AuthSession>
 // Registro de usuario local con validaciones aplicadas en Java.
 export const registrarUsuario = (nombre: string, pin: string): Promise<AuthRegisterResult> => {
   return getAuthBridge().registerUser(nombre, pin);
+};
+
+// Actualiza el PIN del usuario principal (admin/primario) y retorna sesion activa.
+export const actualizarPinPrincipal = (pin: string): Promise<AuthSession> => {
+  return getAuthBridge().updatePrimaryUserPin(pin);
 };

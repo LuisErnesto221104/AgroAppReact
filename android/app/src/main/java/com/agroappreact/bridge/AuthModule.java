@@ -160,6 +160,45 @@ public class AuthModule extends ReactContextBaseJavaModule {
         });
     }
 
+    @ReactMethod
+    public void updatePrimaryUserPin(String pin, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                validarPin(pin);
+
+                Usuario principal = usuarioDAO.obtenerAdmin();
+                if (principal == null) {
+                    principal = usuarioDAO.obtenerUsuarioNormal();
+                }
+
+                if (principal == null) {
+                    promise.reject("AUTH_NO_USERS", "No hay usuarios registrados en el dispositivo.");
+                    return;
+                }
+
+                String hash = PinSecurity.hashPin(pin);
+                principal.setPin(hash);
+
+                int updated = usuarioDAO.actualizarUsuario(principal);
+                if (updated <= 0) {
+                    promise.reject("AUTH_UPDATE_PIN_ERROR", "No se pudo actualizar el PIN del usuario principal.");
+                    return;
+                }
+
+                WritableMap result = Arguments.createMap();
+                result.putBoolean("ok", true);
+                result.putInt("userId", principal.getId());
+                result.putString("name", principal.getNombre());
+                result.putString("role", principal.getRol().name());
+                promise.resolve(result);
+            } catch (IllegalArgumentException e) {
+                promise.reject("AUTH_VALIDATION_ERROR", e.getMessage());
+            } catch (Exception e) {
+                promise.reject("AUTH_UPDATE_PIN_ERROR", "No se pudo actualizar el PIN: " + e.getMessage());
+            }
+        });
+    }
+
     private void validarPin(String pin) {
         if (!PinSecurity.isPinFormatValid(pin)) {
             throw new IllegalArgumentException("El PIN debe contener solo digitos y tener entre 4 y 6 caracteres.");

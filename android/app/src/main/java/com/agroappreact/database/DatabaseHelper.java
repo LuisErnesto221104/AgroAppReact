@@ -16,7 +16,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 7;
+    private static final int DATABASE_VERSION = 8;
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -29,9 +29,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String TABLE_ANIMALES = "animales";
     public static final String COL_ANIMAL_ID = "id";
     public static final String COL_ANIMAL_ARETE = "numero_arete";
+    public static final String COL_ANIMAL_ESPECIE = "especie";
     public static final String COL_ANIMAL_NOMBRE = "nombre";
     public static final String COL_ANIMAL_RAZA = "raza";
     public static final String COL_ANIMAL_SEXO = "sexo";
+    public static final String COL_ANIMAL_FECHA_REGISTRO = "fecha_registro";
+    public static final String COL_ANIMAL_PESO = "peso";
     public static final String COL_ANIMAL_FECHA_NACIMIENTO = "fecha_nacimiento";
     public static final String COL_ANIMAL_FECHA_INGRESO = "fecha_ingreso";
     public static final String COL_ANIMAL_FECHA_SALIDA = "fecha_salida";
@@ -117,15 +120,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String createAnimales = "CREATE TABLE " + TABLE_ANIMALES + " (" +
                 COL_ANIMAL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COL_ANIMAL_ARETE + " TEXT UNIQUE NOT NULL, " +
+            COL_ANIMAL_ESPECIE + " TEXT, " +
+            COL_ANIMAL_SEXO + " TEXT, " +
+            COL_ANIMAL_FECHA_REGISTRO + " TEXT, " +
+            COL_ANIMAL_PESO + " REAL, " +
+            COL_ANIMAL_FOTO + " TEXT, " +
                 COL_ANIMAL_NOMBRE + " TEXT, " +
                 COL_ANIMAL_RAZA + " TEXT, " +
-                COL_ANIMAL_SEXO + " TEXT, " +
                 COL_ANIMAL_FECHA_NACIMIENTO + " TEXT, " +
                 COL_ANIMAL_FECHA_INGRESO + " TEXT, " +
                 COL_ANIMAL_FECHA_SALIDA + " TEXT, " +
                 COL_ANIMAL_PRECIO_COMPRA + " REAL, " +
                 COL_ANIMAL_PRECIO_VENTA + " REAL, " +
-                COL_ANIMAL_FOTO + " TEXT, " +
                 COL_ANIMAL_ESTADO + " TEXT, " +
                 COL_ANIMAL_OBSERVACIONES + " TEXT, " +
                 COL_ANIMAL_PESO_NACER + " REAL, " +
@@ -235,6 +241,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
         if (oldVersion < 7) {
             migrarUsuariosV7(db);
+        }
+        if (oldVersion < 8) {
+            db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_ESPECIE + " TEXT");
+            db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_FECHA_REGISTRO + " TEXT");
+            db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_PESO + " REAL");
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_animales_arete_unique ON " + TABLE_ANIMALES + "(" + COL_ANIMAL_ARETE + ")");
         }
     }
     

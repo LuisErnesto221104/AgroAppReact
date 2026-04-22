@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
-import { iniciarSesionPrincipal, obtenerEstadoAuth, registrarUsuario } from '../../native/AuthModule';
+import {
+  actualizarPinPrincipal,
+  iniciarSesionPrincipal,
+  obtenerEstadoAuth,
+  registrarUsuario,
+} from '../../native/AuthModule';
 import { consumeSessionLockReason, shouldShowAuthIntroOnEntry } from '../../shared/services/sessionManager';
 import { LoadingScreen } from './LoadingScreen';
 import { PIN_MAX, PIN_MIN } from './authStyles';
@@ -18,6 +23,7 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
   const [mode, setMode] = useState<ScreenMode>('login');
   const [requiresSetup, setRequiresSetup] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isFirstEntry, setIsFirstEntry] = useState(false);
   const [primaryUserName, setPrimaryUserName] = useState('Administrador');
   const [pin, setPin] = useState('');
   const [pendingSetupPin, setPendingSetupPin] = useState('');
@@ -55,9 +61,11 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
         setRequiresSetup(false);
 
         const mustShowIntro = await shouldShowAuthIntroOnEntry();
+        setIsFirstEntry(mustShowIntro);
         setMode(mustShowIntro ? 'splash' : 'login');
       } catch {
         // Si no se puede leer estado, mantenemos defaults para no bloquear la vista.
+        setIsFirstEntry(false);
         setMode('login');
       } finally {
         setLoading(false);
@@ -138,10 +146,31 @@ export default function AuthFlow({ onAuthenticated }: AuthFlowProps) {
     try {
       const session = await iniciarSesionPrincipal(pin);
       setError('');
+      setInfoMessage('');
+      setIsFirstEntry(false);
       setPin('');
       Alert.alert('Acceso permitido', `Bienvenido ${session.name}.`);
       await onAuthenticated?.();
     } catch (nativeError: any) {
+      if (isFirstEntry) {
+        try {
+          const session = await actualizarPinPrincipal(pin);
+          setError('');
+          setInfoMessage('PIN creado y guardado correctamente.');
+          setIsFirstEntry(false);
+          setPin('');
+          Alert.alert('PIN creado', `Bienvenido ${session.name}.`);
+          await onAuthenticated?.();
+          return;
+        } catch (updateError: any) {
+          const bootstrapMessage =
+            updateError?.message ?? 'No se pudo crear el PIN inicial. Intente de nuevo.';
+          setError(bootstrapMessage);
+          setPin('');
+          return;
+        }
+      }
+
       const message = nativeError?.message ?? 'PIN incorrecto. Intente de nuevo.';
       setError(message);
       setPin('');

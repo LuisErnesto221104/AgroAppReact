@@ -53,6 +53,7 @@ const WEEKDAY_LABELS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 
 type RegistrarAnimalScreenProps = {
   onBack: () => void;
+  onSuccess?: () => void;
 };
 
 const INITIAL_FORM_STATE: AnimalFormState = {
@@ -64,7 +65,7 @@ const INITIAL_FORM_STATE: AnimalFormState = {
   fotoPath: null,
 };
 
-export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
+export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScreenProps) {
   const [form, setForm] = useState<AnimalFormState>(INITIAL_FORM_STATE);
   const [loading, setLoading] = useState(false);
   const [areteError, setAreteError] = useState<string | null>(null);
@@ -181,6 +182,7 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
       Alert.alert('Registro exitoso', `Animal con arete ${payload.arete} registrado.`);
       setForm(INITIAL_FORM_STATE);
       setAreteError(null);
+      onSuccess?.();
     } catch (error) {
       const errorCode =
         typeof error === 'object' && error !== null && 'code' in error

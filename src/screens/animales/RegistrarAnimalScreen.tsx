@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { AnimalFotoCaptura } from '../../components/animales/AnimalFotoCaptura';
 import { AnimalModule } from '../../native/AnimalModule';
 import type { AnimalFormState, InsertAnimalPayload } from '../../types/Animal';
 import { validateArete } from '../../utils/validaciones/areteValidator';
@@ -24,7 +25,7 @@ const INITIAL_FORM_STATE: AnimalFormState = {
   sexo: '',
   fecha: '',
   peso: '',
-  foto: '',
+  fotoPath: null,
 };
 
 export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
@@ -60,7 +61,7 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
       sexo: form.sexo.trim(),
       fecha: form.fecha.trim(),
       peso: pesoValue.length > 0 ? Number(pesoValue) : null,
-      foto: form.foto.trim().length > 0 ? form.foto.trim() : null,
+      foto_path: form.fotoPath,
     };
   };
 
@@ -171,13 +172,10 @@ export function RegistrarAnimalScreen({ onBack }: RegistrarAnimalScreenProps) {
           keyboardType="decimal-pad"
         />
 
-        <Text style={styles.label}>Foto (URI o ruta)</Text>
-        <TextInput
-          value={form.foto}
-          onChangeText={value => setField('foto', value)}
-          placeholder="file:///... o content://..."
-          style={styles.input}
-          autoCapitalize="none"
+        <Text style={styles.label}>Fotografia del animal</Text>
+        <AnimalFotoCaptura
+          rutaLocal={form.fotoPath}
+          onRutaLocalChange={rutaLocal => setForm(prev => ({ ...prev, fotoPath: rutaLocal }))}
         />
 
         <Pressable

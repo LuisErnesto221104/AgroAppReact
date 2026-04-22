@@ -4,7 +4,7 @@ export interface AnimalFormState {
   sexo: string;
   fecha: string;
   peso: string;
-  foto: string;
+  fotoPath: string | null;
 }
 
 export interface AnimalModel {
@@ -23,7 +23,7 @@ export interface InsertAnimalPayload {
   sexo: string;
   fecha: string;
   peso: number | null;
-  foto: string | null;
+  foto_path: string | null;
 }
 
 export interface InsertAnimalResult {

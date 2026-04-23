@@ -1,6 +1,7 @@
 package com.agroappreact.bridge;
 
 import com.agroappreact.animales.AnimalModule;
+import com.agroappreact.animales.AnimalCameraModule;
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -19,6 +20,7 @@ public class AgroAppPackage implements ReactPackage {
         modules.add(new AgroBridgeModule(reactContext));
         modules.add(new AuthModule(reactContext));
         modules.add(new AnimalModule(reactContext));
+        modules.add(new AnimalCameraModule(reactContext));
         return modules;
     }
 

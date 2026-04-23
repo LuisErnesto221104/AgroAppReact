@@ -1,7 +1,9 @@
 package com.agroappreact.animales;
 
+import android.content.Context;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteConstraintException;
+import android.net.Uri;
 
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.utils.AreteValidator;
@@ -13,6 +15,12 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -56,7 +64,12 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                 String especie = readRequiredString(payload, "especie");
                 String sexo = readRequiredString(payload, "sexo");
                 String fecha = readRequiredString(payload, "fecha");
-                String foto = readOptionalString(payload, "foto");
+                String fotoPath = readOptionalString(payload, "foto_path");
+                if (fotoPath == null) {
+                    fotoPath = readOptionalString(payload, "foto");
+                }
+
+                String fotoRelativePath = copyPhotoToInternalStorage(arete, fotoPath);
 
                 Double peso = null;
                 if (payload.hasKey("peso") && !payload.isNull("peso")) {
@@ -69,7 +82,7 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                         sexo,
                         fecha,
                         peso,
-                        foto
+                        fotoRelativePath
                 );
 
                 if (animalId <= 0) {
@@ -112,5 +125,53 @@ public class AnimalModule extends ReactContextBaseJavaModule {
             return null;
         }
         return payload.getString(key);
+    }
+
+    private String copyPhotoToInternalStorage(String arete, String sourcePath) throws IOException {
+        if (sourcePath == null || sourcePath.trim().isEmpty()) {
+            return null;
+        }
+
+        Context context = getReactApplicationContext();
+        File photosDir = new File(context.getFilesDir(), "fotos/animales");
+        if (!photosDir.exists() && !photosDir.mkdirs()) {
+            throw new IOException("No se pudo crear la carpeta de fotos internas.");
+        }
+
+        File destinationFile = new File(photosDir, arete + ".jpg");
+        try (InputStream inputStream = openPhotoInputStream(sourcePath);
+             OutputStream outputStream = new FileOutputStream(destinationFile)) {
+            if (inputStream == null) {
+                throw new IOException("No se pudo abrir la fotografia capturada.");
+            }
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.flush();
+        }
+
+        return "fotos/animales/" + arete + ".jpg";
+    }
+
+    private InputStream openPhotoInputStream(String sourcePath) throws IOException {
+        Uri uri = Uri.parse(sourcePath);
+        String scheme = uri.getScheme();
+
+        if (scheme == null || scheme.isEmpty()) {
+            return new FileInputStream(new File(sourcePath));
+        }
+
+        if ("file".equalsIgnoreCase(scheme) || "content".equalsIgnoreCase(scheme)) {
+            InputStream inputStream = getReactApplicationContext().getContentResolver().openInputStream(uri);
+            if (inputStream == null) {
+                throw new IOException("No se pudo leer la fotografia desde la URI.");
+            }
+            return inputStream;
+        }
+
+        return new FileInputStream(new File(sourcePath));
     }
 }

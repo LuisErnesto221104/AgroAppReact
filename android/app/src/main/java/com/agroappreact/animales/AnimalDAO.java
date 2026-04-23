@@ -12,7 +12,7 @@ public class AnimalDAO {
         this.dbHelper = dbHelper;
     }
 
-    public long insertAnimal(String arete, String especie, String sexo, String fecha, Double peso, String foto) {
+    public long insertAnimal(String arete, String especie, String sexo, String fecha, Double peso, String fotoPath) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
         try {
@@ -26,7 +26,7 @@ public class AnimalDAO {
             if (peso != null) {
                 values.put(DatabaseHelper.COL_PESO, peso);
             }
-            values.put(DatabaseHelper.COL_FOTO, foto);
+            values.put(DatabaseHelper.COL_FOTO, fotoPath);
 
             long id = db.insertOrThrow(DatabaseHelper.TABLE_ANIMALES, null, values);
             db.setTransactionSuccessful();

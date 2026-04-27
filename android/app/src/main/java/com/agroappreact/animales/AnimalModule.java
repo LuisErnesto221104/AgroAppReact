@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 
 import java.io.File;
@@ -21,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,6 +31,7 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     private static final String ERR_ARETE_FORMAT = "ERR_ARETE_FORMAT";
     private static final String ERR_ARETE_DUPLICATE = "ERR_ARETE_DUPLICATE";
     private static final String ERR_ARETE_EMPTY = "ERR_ARETE_EMPTY";
+    private static final String ERR_NOT_FOUND = "ERR_ANIMAL_NOT_FOUND";
 
     private final AnimalDAO animalDAO;
     private final ExecutorService executorService;
@@ -112,6 +115,114 @@ public class AnimalModule extends ReactContextBaseJavaModule {
         });
     }
 
+    @ReactMethod
+    public void listAnimals(Promise promise) {
+        executorService.execute(() -> {
+            try {
+                List<AnimalDAO.AnimalRecord> animals = animalDAO.listAnimals();
+                WritableArray result = Arguments.createArray();
+                for (AnimalDAO.AnimalRecord animal : animals) {
+                    result.pushMap(toWritableMap(animal));
+                }
+                promise.resolve(result);
+            } catch (Exception e) {
+                promise.reject("ANIMAL_LIST_ERROR", "No se pudo obtener el listado de animales: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
+    public void updateAnimal(ReadableMap payload, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                if (!payload.hasKey("id") || payload.isNull("id")) {
+                    promise.reject("ANIMAL_VALIDATION_ERROR", "El id del animal es obligatorio.");
+                    return;
+                }
+
+                long id = (long) payload.getDouble("id");
+                AnimalDAO.AnimalRecord current = animalDAO.getAnimalById(id);
+                if (current == null) {
+                    promise.reject(ERR_NOT_FOUND, "No se encontro el animal a editar.");
+                    return;
+                }
+
+                String especie = readRequiredString(payload, "especie");
+                String sexo = readRequiredString(payload, "sexo");
+                String fecha = readRequiredString(payload, "fecha");
+                String newPhotoPath = readOptionalString(payload, "foto_path");
+                Double peso = null;
+                if (payload.hasKey("peso") && !payload.isNull("peso")) {
+                    peso = payload.getDouble("peso");
+                }
+
+                String fotoRelativePath = current.foto;
+                if (newPhotoPath != null && !newPhotoPath.trim().isEmpty()) {
+                    fotoRelativePath = copyPhotoToInternalStorage(current.arete, newPhotoPath);
+                }
+
+                int updatedRows = animalDAO.updateAnimal(
+                        id,
+                        especie,
+                        sexo,
+                        fecha,
+                        peso,
+                        fotoRelativePath,
+                        String.valueOf(System.currentTimeMillis())
+                );
+
+                if (updatedRows <= 0) {
+                    promise.reject("ANIMAL_UPDATE_ERROR", "No se pudo actualizar el animal.");
+                    return;
+                }
+
+                AnimalDAO.AnimalRecord updated = animalDAO.getAnimalById(id);
+                WritableMap result = Arguments.createMap();
+                result.putBoolean("ok", true);
+                result.putMap("animal", updated == null ? toWritableMap(current) : toWritableMap(updated));
+                promise.resolve(result);
+            } catch (IllegalArgumentException e) {
+                promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
+            } catch (Exception e) {
+                promise.reject("ANIMAL_UPDATE_ERROR", "No se pudo actualizar el animal: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
+    public void deleteAnimal(ReadableMap payload, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                if (!payload.hasKey("id") || payload.isNull("id")) {
+                    promise.reject("ANIMAL_VALIDATION_ERROR", "El id del animal es obligatorio.");
+                    return;
+                }
+
+                long id = (long) payload.getDouble("id");
+                AnimalDAO.AnimalRecord animal = animalDAO.getAnimalById(id);
+                if (animal == null) {
+                    promise.reject(ERR_NOT_FOUND, "No se encontro el animal a eliminar.");
+                    return;
+                }
+
+                deleteAnimalPhotoIfExists(animal.arete);
+
+                int deletedRows = animalDAO.deleteAnimal(id);
+                if (deletedRows <= 0) {
+                    promise.reject("ANIMAL_DELETE_ERROR", "No se pudo eliminar el animal.");
+                    return;
+                }
+
+                WritableMap result = Arguments.createMap();
+                result.putBoolean("ok", true);
+                result.putDouble("animalId", id);
+                promise.resolve(result);
+            } catch (Exception e) {
+                promise.reject("ANIMAL_DELETE_ERROR", "No se pudo eliminar el animal: " + e.getMessage());
+            }
+        });
+    }
+
     private String readRequiredString(ReadableMap payload, String key) {
         String value = readOptionalString(payload, key);
         if (value == null || value.trim().isEmpty()) {
@@ -154,6 +265,39 @@ public class AnimalModule extends ReactContextBaseJavaModule {
         }
 
         return "fotos/animales/" + arete + ".jpg";
+    }
+
+    private void deleteAnimalPhotoIfExists(String arete) {
+        if (arete == null || arete.trim().isEmpty()) {
+            return;
+        }
+
+        Context context = getReactApplicationContext();
+        File photoFile = new File(context.getFilesDir(), "fotos/animales/" + arete + ".jpg");
+        if (photoFile.exists()) {
+            // Si falla el borrado físico, no bloqueamos el delete SQL.
+            photoFile.delete();
+        }
+    }
+
+    private WritableMap toWritableMap(AnimalDAO.AnimalRecord record) {
+        WritableMap map = Arguments.createMap();
+        map.putDouble("id", record.id);
+        map.putString("arete", record.arete);
+        map.putString("especie", record.especie);
+        map.putString("sexo", record.sexo);
+        map.putString("fecha", record.fecha);
+        if (record.peso == null) {
+            map.putNull("peso");
+        } else {
+            map.putDouble("peso", record.peso);
+        }
+        if (record.foto == null) {
+            map.putNull("foto");
+        } else {
+            map.putString("foto", record.foto);
+        }
+        return map;
     }
 
     private InputStream openPhotoInputStream(String sourcePath) throws IOException {

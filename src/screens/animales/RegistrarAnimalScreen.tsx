@@ -68,6 +68,7 @@ const INITIAL_FORM_STATE: AnimalFormState = {
 export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScreenProps) {
   const [form, setForm] = useState<AnimalFormState>(INITIAL_FORM_STATE);
   const [loading, setLoading] = useState(false);
+  const submittingRef = React.useRef(false);
   const [areteError, setAreteError] = useState<string | null>(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -158,9 +159,11 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
   };
 
   const onRegistrar = async () => {
-    if (!canSubmit || loading) {
+    if (!canSubmit || loading || submittingRef.current) {
       return;
     }
+
+    submittingRef.current = true;
 
     const areteValidation = validateArete(form.arete);
     if (!areteValidation.valid) {
@@ -208,6 +211,7 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
       Alert.alert('Error de registro', message);
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 

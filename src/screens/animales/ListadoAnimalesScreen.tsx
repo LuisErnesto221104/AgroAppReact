@@ -18,7 +18,7 @@ import { AnimalEstado, AnimalModel } from '../../types/Animal';
 type ListadoAnimalesScreenProps = {
   onBackHome: () => void;
   onCreateAnimal: () => void;
-  onOpenDetail: (animal: AnimalModel) => void;
+  onOpenDetail: (animalId: number) => void;
 };
 
 export function ListadoAnimalesScreen({
@@ -139,7 +139,7 @@ export function ListadoAnimalesScreen({
           contentContainerStyle={visibleAnimals.length === 0 ? styles.emptyContainer : styles.listContainer}
           ListEmptyComponent={<Text style={styles.emptyText}>No hay animales registrados todavía.</Text>}
           renderItem={({ item }) => (
-            <Pressable style={styles.itemCard} onPress={() => onOpenDetail(item)}>
+            <Pressable style={styles.itemCard} onPress={() => onOpenDetail(item.id)}>
               <View>
                 <Text style={styles.arete}>Arete: {item.arete}</Text>
                 <Text style={styles.metaText}>Especie: {item.especie}</Text>

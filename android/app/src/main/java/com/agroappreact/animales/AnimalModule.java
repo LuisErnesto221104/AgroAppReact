@@ -141,6 +141,38 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getAnimalById(double animalId, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                long id = (long) animalId;
+                AnimalDAO.AnimalRecord animal = animalDAO.getAnimalById(id);
+                if (animal == null) {
+                    promise.reject(ERR_NOT_FOUND, "No se encontro el animal solicitado.");
+                    return;
+                }
+                promise.resolve(toWritableMap(animal));
+            } catch (Exception e) {
+                promise.reject("ANIMAL_DETAIL_ERROR", "No se pudo cargar el detalle del animal: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
+    public void getHistorialResumen(double animalId, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                long id = (long) animalId;
+                WritableMap result = Arguments.createMap();
+                result.putArray("historial_peso", toPesoHistorialArray(animalDAO.getHistorialPeso(id, 10)));
+                result.putArray("eventos_recientes", toEventosArray(animalDAO.getEventosRecientes(id, 10)));
+                promise.resolve(result);
+            } catch (Exception e) {
+                promise.reject("ANIMAL_HISTORIAL_ERROR", "No se pudo cargar el historial del animal: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
     public void updateAnimal(ReadableMap payload, Promise promise) {
         executorService.execute(() -> {
             try {
@@ -435,7 +467,7 @@ public class AnimalModule extends ReactContextBaseJavaModule {
         if (record.foto == null) {
             map.putNull("foto");
         } else {
-            map.putString("foto", record.foto);
+            map.putString("foto", resolvePhotoUri(record.foto));
         }
         map.putString("estado", normalizeEstado(record.estado));
         if (record.fechaBaja == null) {
@@ -451,10 +483,75 @@ public class AnimalModule extends ReactContextBaseJavaModule {
         return map;
     }
 
+    private String resolvePhotoUri(String storedPath) {
+        if (storedPath == null || storedPath.trim().isEmpty()) {
+            return null;
+        }
+
+        String trimmed = storedPath.trim();
+        if (trimmed.startsWith("file://") || trimmed.startsWith("content://") || trimmed.startsWith("http")) {
+            return trimmed;
+        }
+
+        File file = new File(getReactApplicationContext().getFilesDir(), trimmed);
+        return Uri.fromFile(file).toString();
+    }
+
     private WritableArray toWritableArray(List<AnimalDAO.AnimalRecord> records) {
         WritableArray array = Arguments.createArray();
         for (AnimalDAO.AnimalRecord record : records) {
             array.pushMap(toWritableMap(record));
+        }
+        return array;
+    }
+
+    private WritableArray toPesoHistorialArray(List<AnimalDAO.PesoRecord> records) {
+        WritableArray array = Arguments.createArray();
+        for (AnimalDAO.PesoRecord record : records) {
+            WritableMap map = Arguments.createMap();
+            map.putString("fecha", record.fecha);
+            map.putDouble("peso", record.peso);
+            array.pushMap(map);
+        }
+        return array;
+    }
+
+    private WritableArray toEventosArray(List<AnimalDAO.EventoRecord> records) {
+        WritableArray array = Arguments.createArray();
+        for (AnimalDAO.EventoRecord record : records) {
+            WritableMap map = Arguments.createMap();
+            map.putDouble("id", record.id);
+            if (record.fecha == null) {
+                map.putNull("fecha");
+            } else {
+                map.putString("fecha", record.fecha);
+            }
+            if (record.enfermedad == null) {
+                map.putNull("enfermedad");
+            } else {
+                map.putString("enfermedad", record.enfermedad);
+            }
+            if (record.sintomas == null) {
+                map.putNull("sintomas");
+            } else {
+                map.putString("sintomas", record.sintomas);
+            }
+            if (record.tratamiento == null) {
+                map.putNull("tratamiento");
+            } else {
+                map.putString("tratamiento", record.tratamiento);
+            }
+            if (record.estado == null) {
+                map.putNull("estado");
+            } else {
+                map.putString("estado", record.estado);
+            }
+            if (record.observaciones == null) {
+                map.putNull("observaciones");
+            } else {
+                map.putString("observaciones", record.observaciones);
+            }
+            array.pushMap(map);
         }
         return array;
     }

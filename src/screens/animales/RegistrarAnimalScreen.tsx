@@ -30,8 +30,8 @@ const ESPECIES_OPTIONS = [
 ];
 
 const SEXO_OPTIONS = [
-  { label: 'M', value: 'M' },
-  { label: 'F', value: 'F' },
+  { label: 'Macho', value: 'M' },
+  { label: 'Hembra', value: 'H' },
 ];
 
 const MONTH_NAMES = [
@@ -98,6 +98,14 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
     return `${year}-${month}-${day}`;
   };
 
+  const isFutureDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const candidate = new Date(date);
+    candidate.setHours(0, 0, 0, 0);
+    return candidate.getTime() > today.getTime();
+  };
+
   const parseCalendarDate = (year: number, month: number, day: number) => {
     return new Date(year, month, day);
   };
@@ -128,6 +136,10 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
   const closeCalendar = () => setDatePickerVisible(false);
 
   const selectDate = (date: Date) => {
+    if (isFutureDate(date)) {
+      Alert.alert('Fecha invalida', 'No puedes seleccionar una fecha posterior a hoy.');
+      return;
+    }
     setField('fecha', formatDate(date));
     setDatePickerVisible(false);
   };
@@ -136,7 +148,18 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
+  const isAtCurrentMonth = () => {
+    const now = new Date();
+    return (
+      calendarMonth.getFullYear() > now.getFullYear() ||
+      (calendarMonth.getFullYear() === now.getFullYear() && calendarMonth.getMonth() >= now.getMonth())
+    );
+  };
+
   const goNextMonth = () => {
+    if (isAtCurrentMonth()) {
+      return;
+    }
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
@@ -313,8 +336,12 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
               <Text style={styles.calendarTitle}>
                 {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
               </Text>
-              <Pressable onPress={goNextMonth} style={styles.calendarNavButton}>
-                <Text style={styles.calendarNavText}>›</Text>
+              <Pressable
+                onPress={goNextMonth}
+                style={[styles.calendarNavButton, isAtCurrentMonth() && styles.calendarNavButtonDisabled]}
+                disabled={isAtCurrentMonth()}
+              >
+                <Text style={[styles.calendarNavText, isAtCurrentMonth() && styles.calendarNavTextDisabled]}>›</Text>
               </Pressable>
             </View>
 
@@ -333,11 +360,13 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
                 }
 
                 const isSelected = form.fecha === formatDate(day);
+                const isDisabled = isFutureDate(day);
                 return (
                   <Pressable
                     key={day.toISOString()}
-                    style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                    style={[styles.dayCell, isSelected && styles.dayCellSelected, isDisabled && styles.dayCellDisabled]}
                     onPress={() => selectDate(day)}
+                    disabled={isDisabled}
                   >
                     <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{day.getDate()}</Text>
                   </Pressable>
@@ -507,6 +536,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
   },
+  calendarNavButtonDisabled: {
+    opacity: 0.3,
+  },
+  calendarNavTextDisabled: {
+    color: '#aaaaaa',
+  },
   calendarTitle: {
     color: '#1c2b1d',
     fontSize: 16,
@@ -537,6 +572,9 @@ const styles = StyleSheet.create({
   },
   dayCellSelected: {
     backgroundColor: '#0f6f35',
+  },
+  dayCellDisabled: {
+    opacity: 0.35,
   },
   dayText: {
     color: '#1c2b1d',

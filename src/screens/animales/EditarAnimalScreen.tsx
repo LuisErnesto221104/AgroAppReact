@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -29,8 +29,8 @@ const ESPECIES_OPTIONS = [
 ];
 
 const SEXO_OPTIONS = [
-  { label: 'M', value: 'M' },
-  { label: 'F', value: 'F' },
+  { label: 'Macho', value: 'M' },
+  { label: 'Hembra', value: 'H' },
 ];
 
 const MONTH_NAMES = [
@@ -69,35 +69,67 @@ type EditFormState = {
 };
 
 export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScreenProps) {
+  const normalizeSexo = (sexo: string | null | undefined) => {
+    if (sexo === 'F') {
+      return 'H';
+    }
+    return sexo ?? 'M';
+  };
+
+  const initialPhotoUri = useMemo(() => {
+    const raw = animal.foto?.trim();
+    if (!raw) {
+      return null;
+    }
+    if (raw.startsWith('file://') || raw.startsWith('content://') || raw.startsWith('http')) {
+      return raw;
+    }
+    return `file://${raw}`;
+  }, [animal.foto]);
+
   const [form, setForm] = useState<EditFormState>({
     arete: animal.arete,
     especie: animal.especie,
-    sexo: animal.sexo,
+    sexo: normalizeSexo(animal.sexo),
     fecha: animal.fecha,
     peso: animal.peso == null ? '' : String(Math.trunc(animal.peso)),
-    fotoPath: null,
+    fotoPath: initialPhotoUri,
     estado: animal.estado === 'FALLECIDO' ? 'FALLECIDO' : 'ACTIVO',
     fechaBaja: animal.fecha_baja ?? '',
     motivoBaja: animal.motivo_baja ?? '',
   });
   const [loading, setLoading] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerBajaVisible, setDatePickerBajaVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     return form.fecha ? new Date(`${form.fecha}T00:00:00`) : new Date();
   });
 
   const canSubmit = useMemo(() => {
-    if (form.estado === 'FALLECIDO') {
-      return (
-        form.especie.trim().length > 0 &&
-        form.sexo.trim().length > 0 &&
-        form.fecha.trim().length > 0 &&
-        form.fechaBaja.trim().length > 0 &&
-        form.motivoBaja.trim().length > 0
-      );
-    }
     return form.especie.trim().length > 0 && form.sexo.trim().length > 0 && form.fecha.trim().length > 0;
   }, [form]);
+
+  useEffect(() => {
+    if (form.estado !== 'FALLECIDO') {
+      return;
+    }
+
+    setForm(prev => {
+      const today = formatDate(new Date());
+      const nextFechaBaja = prev.fechaBaja.trim().length > 0 ? prev.fechaBaja : today;
+      const nextMotivoBaja = prev.motivoBaja.trim().length > 0 ? prev.motivoBaja : 'Cambio de estado registrado desde editar';
+
+      if (nextFechaBaja === prev.fechaBaja && nextMotivoBaja === prev.motivoBaja) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        fechaBaja: nextFechaBaja,
+        motivoBaja: nextMotivoBaja,
+      };
+    });
+  }, [form.estado]);
 
   const setField = (key: keyof EditFormState, value: string | null) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -110,6 +142,14 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const isFutureDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const candidate = new Date(date);
+    candidate.setHours(0, 0, 0, 0);
+    return candidate.getTime() > today.getTime();
   };
 
   const parseCalendarDate = (year: number, month: number, day: number) => {
@@ -139,18 +179,49 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     setDatePickerVisible(true);
   };
 
+  const openCalendarBaja = () => {
+    setCalendarMonth(form.fechaBaja ? new Date(`${form.fechaBaja}T00:00:00`) : new Date());
+    setDatePickerBajaVisible(true);
+  };
+
   const closeCalendar = () => setDatePickerVisible(false);
 
+  const closeCalendarBaja = () => setDatePickerBajaVisible(false);
+
   const selectDate = (date: Date) => {
+    if (isFutureDate(date)) {
+      Alert.alert('Fecha invalida', 'No puedes seleccionar una fecha posterior a hoy.');
+      return;
+    }
     setField('fecha', formatDate(date));
     setDatePickerVisible(false);
+  };
+
+  const selectDateBaja = (date: Date) => {
+    if (isFutureDate(date)) {
+      Alert.alert('Fecha invalida', 'No puedes seleccionar una fecha posterior a hoy.');
+      return;
+    }
+    setField('fechaBaja', formatDate(date));
+    setDatePickerBajaVisible(false);
   };
 
   const goPreviousMonth = () => {
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
+  const isAtCurrentMonth = () => {
+    const now = new Date();
+    return (
+      calendarMonth.getFullYear() > now.getFullYear() ||
+      (calendarMonth.getFullYear() === now.getFullYear() && calendarMonth.getMonth() >= now.getMonth())
+    );
+  };
+
   const goNextMonth = () => {
+    if (isAtCurrentMonth()) {
+      return;
+    }
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
@@ -159,6 +230,10 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
       return;
     }
 
+    const normalizedSelectedPhoto = form.fotoPath?.trim() ?? '';
+    const normalizedInitialPhoto = initialPhotoUri?.trim() ?? '';
+    const hasNewPhoto = normalizedSelectedPhoto.length > 0 && normalizedSelectedPhoto !== normalizedInitialPhoto;
+
     const payload: UpdateAnimalPayload = {
       id: animal.id,
       arete: animal.arete,
@@ -166,7 +241,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
       sexo: form.sexo.trim(),
       fecha: form.fecha.trim(),
       peso: form.peso.trim().length === 0 ? null : Number(form.peso),
-      foto_path: form.fotoPath,
+      foto_path: hasNewPhoto ? form.fotoPath : null,
     };
 
     if (payload.peso !== null && Number.isNaN(payload.peso)) {
@@ -182,8 +257,16 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
         await AnimalModule.changeEstado({
           id: animal.id,
           estado: 'FALLECIDO',
-          fecha_baja: form.fechaBaja.trim(),
-          motivo_baja: form.motivoBaja.trim(),
+          fecha_baja: form.fechaBaja.trim().length > 0 ? form.fechaBaja.trim() : formatDate(new Date()),
+          motivo_baja:
+            form.motivoBaja.trim().length > 0
+              ? form.motivoBaja.trim()
+              : 'Cambio de estado registrado desde editar',
+        });
+      } else if (animal.estado === 'FALLECIDO' && form.estado === 'ACTIVO') {
+        await AnimalModule.changeEstado({
+          id: animal.id,
+          estado: 'ACTIVO',
         });
       }
 
@@ -250,7 +333,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           </Pressable>
         </View>
 
-        {animal.estado === 'ACTIVO' ? (
+        {animal.estado !== 'VENDIDO' ? (
           <Pressable
             style={[styles.fallecidoToggle, form.estado === 'FALLECIDO' && styles.fallecidoToggleActive]}
             onPress={() =>
@@ -269,12 +352,12 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
         {form.estado === 'FALLECIDO' ? (
           <>
             <Text style={styles.label}>Fecha de baja *</Text>
-            <TextInput
-              value={form.fechaBaja}
-              onChangeText={value => setField('fechaBaja', value)}
-              placeholder="YYYY-MM-DD"
-              style={styles.input}
-            />
+            <Pressable style={styles.dateField} onPress={openCalendarBaja}>
+              <Text style={[styles.dateFieldText, !form.fechaBaja && styles.dateFieldPlaceholder]}>
+                {form.fechaBaja || 'Selecciona una fecha'}
+              </Text>
+              <Text style={styles.dateFieldIcon}>📅</Text>
+            </Pressable>
 
             <Text style={styles.label}>Causa de fallecimiento *</Text>
             <TextInput
@@ -339,7 +422,10 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
         />
 
         <Text style={styles.label}>Fotografia del animal</Text>
-        <AnimalFotoCaptura rutaLocal={form.fotoPath} onRutaLocalChange={rutaLocal => setField('fotoPath', rutaLocal)} />
+        <AnimalFotoCaptura
+          rutaLocal={form.fotoPath ?? initialPhotoUri}
+          onRutaLocalChange={rutaLocal => setField('fotoPath', rutaLocal)}
+        />
 
         <Pressable
           onPress={onGuardar}
@@ -360,8 +446,12 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
               <Text style={styles.calendarTitle}>
                 {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
               </Text>
-              <Pressable onPress={goNextMonth} style={styles.calendarNavButton}>
-                <Text style={styles.calendarNavText}>›</Text>
+              <Pressable
+                onPress={goNextMonth}
+                style={[styles.calendarNavButton, isAtCurrentMonth() && styles.calendarNavButtonDisabled]}
+                disabled={isAtCurrentMonth()}
+              >
+                <Text style={[styles.calendarNavText, isAtCurrentMonth() && styles.calendarNavTextDisabled]}>›</Text>
               </Pressable>
             </View>
 
@@ -380,11 +470,13 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
                 }
 
                 const isSelected = form.fecha === formatDate(day);
+                const isDisabled = isFutureDate(day);
                 return (
                   <Pressable
                     key={day.toISOString()}
-                    style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                    style={[styles.dayCell, isSelected && styles.dayCellSelected, isDisabled && styles.dayCellDisabled]}
                     onPress={() => selectDate(day)}
+                    disabled={isDisabled}
                   >
                     <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{day.getDate()}</Text>
                   </Pressable>
@@ -393,6 +485,61 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
             </View>
 
             <Pressable style={styles.calendarCloseButton} onPress={closeCalendar}>
+              <Text style={styles.calendarCloseText}>Cerrar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={datePickerBajaVisible} transparent animationType="fade" onRequestClose={closeCalendarBaja}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.calendarCard}>
+            <View style={styles.calendarHeader}>
+              <Pressable onPress={goPreviousMonth} style={styles.calendarNavButton}>
+                <Text style={styles.calendarNavText}>‹</Text>
+              </Pressable>
+              <Text style={styles.calendarTitle}>
+                {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+              </Text>
+              <Pressable
+                onPress={goNextMonth}
+                style={[styles.calendarNavButton, isAtCurrentMonth() && styles.calendarNavButtonDisabled]}
+                disabled={isAtCurrentMonth()}
+              >
+                <Text style={[styles.calendarNavText, isAtCurrentMonth() && styles.calendarNavTextDisabled]}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.weekRow}>
+              {WEEKDAY_LABELS.map(day => (
+                <Text key={day} style={styles.weekLabel}>
+                  {day}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {getMonthDays(calendarMonth).map((day, index) => {
+                if (!day) {
+                  return <View key={`baja-empty-${index}`} style={styles.dayCell} />;
+                }
+
+                const isSelected = form.fechaBaja === formatDate(day);
+                const isDisabled = isFutureDate(day);
+                return (
+                  <Pressable
+                    key={`baja-${day.toISOString()}`}
+                    style={[styles.dayCell, isSelected && styles.dayCellSelected, isDisabled && styles.dayCellDisabled]}
+                    onPress={() => selectDateBaja(day)}
+                    disabled={isDisabled}
+                  >
+                    <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{day.getDate()}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable style={styles.calendarCloseButton} onPress={closeCalendarBaja}>
               <Text style={styles.calendarCloseText}>Cerrar</Text>
             </Pressable>
           </View>
@@ -622,6 +769,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
   },
+  calendarNavButtonDisabled: {
+    opacity: 0.3,
+  },
+  calendarNavTextDisabled: {
+    color: '#aaaaaa',
+  },
   calendarTitle: {
     color: '#1c2b1d',
     fontSize: 16,
@@ -652,6 +805,9 @@ const styles = StyleSheet.create({
   },
   dayCellSelected: {
     backgroundColor: '#0f6f35',
+  },
+  dayCellDisabled: {
+    opacity: 0.35,
   },
   dayText: {
     color: '#1c2b1d',

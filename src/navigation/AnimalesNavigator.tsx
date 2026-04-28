@@ -13,7 +13,7 @@ type AnimalesNavigatorProps = {
 type AnimalRoute =
   | { name: 'list' }
   | { name: 'register' }
-  | { name: 'detail'; animalId: number }
+  | { name: 'detail'; animalId: number; refreshToken: number }
   | { name: 'edit'; animal: AnimalModel };
 
 export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
@@ -30,7 +30,9 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
   if (route.name === 'detail') {
     return (
       <DetalleAnimalScreen
+        key={`${route.animalId}-${route.refreshToken}`}
         animalId={route.animalId}
+        refreshToken={route.refreshToken}
         onBack={() => setRoute({ name: 'list' })}
         onEdit={animal => setRoute({ name: 'edit', animal })}
         onDeleted={refreshList}
@@ -42,8 +44,8 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
     return (
       <EditarAnimalScreen
         animal={route.animal}
-        onBack={() => setRoute({ name: 'detail', animalId: route.animal.id })}
-        onSaved={refreshList}
+        onBack={() => setRoute({ name: 'detail', animalId: route.animal.id, refreshToken: Date.now() })}
+        onSaved={() => setRoute({ name: 'detail', animalId: route.animal.id, refreshToken: Date.now() })}
       />
     );
   }
@@ -52,7 +54,7 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
     <ListadoAnimalesScreen
       onBackHome={onBack}
       onCreateAnimal={() => setRoute({ name: 'register' })}
-      onOpenDetail={animalId => setRoute({ name: 'detail', animalId })}
+      onOpenDetail={animalId => setRoute({ name: 'detail', animalId, refreshToken: Date.now() })}
     />
   );
 }

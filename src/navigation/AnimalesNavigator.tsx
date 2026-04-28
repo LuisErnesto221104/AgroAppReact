@@ -18,10 +18,8 @@ type AnimalRoute =
 
 export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
   const [route, setRoute] = useState<AnimalRoute>({ name: 'list' });
-  const [reloadToken, setReloadToken] = useState(0);
 
   const refreshList = () => {
-    setReloadToken(prev => prev + 1);
     setRoute({ name: 'list' });
   };
 
@@ -52,11 +50,6 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
   }
 
   return (
-    <ListadoAnimalesScreen
-      reloadToken={reloadToken}
-      onBackHome={onBack}
-      onCreateAnimal={() => setRoute({ name: 'register' })}
-      onOpenDetail={animal => setRoute({ name: 'detail', animal })}
-    />
+    <ListadoAnimalesScreen onBackHome={onBack} onCreateAnimal={() => setRoute({ name: 'register' })} onOpenDetail={animal => setRoute({ name: 'detail', animal })} />
   );
 }

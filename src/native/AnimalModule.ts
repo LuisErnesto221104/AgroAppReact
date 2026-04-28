@@ -3,6 +3,7 @@ import { NativeModules } from 'react-native';
 import type {
   AnimalModel,
   AnimalEstado,
+  HistorialResumen,
   ChangeEstadoPayload,
   ChangeEstadoResult,
   DeleteAnimalResult,
@@ -16,6 +17,8 @@ type AnimalNativeModule = {
   logEvent(event: string): void;
   insertAnimal(payload: InsertAnimalPayload): Promise<InsertAnimalResult>;
   listAnimals(): Promise<AnimalModel[]>;
+  getAnimalById(id: number): Promise<AnimalModel>;
+  getHistorialResumen(id: number): Promise<HistorialResumen>;
   getAnimalesByEstado(estado: AnimalEstado): Promise<AnimalModel[]>;
   buscarPorArete(termino: string, estado: AnimalEstado): Promise<AnimalModel[]>;
   updateAnimal(payload: UpdateAnimalPayload): Promise<UpdateAnimalResult>;
@@ -44,6 +47,14 @@ export const insertAnimal = (payload: InsertAnimalPayload): Promise<InsertAnimal
 
 export const listAnimals = (): Promise<AnimalModel[]> => {
   return getAnimalBridge().listAnimals();
+};
+
+export const getAnimalById = (id: number): Promise<AnimalModel> => {
+  return getAnimalBridge().getAnimalById(id);
+};
+
+export const getHistorialResumen = (id: number): Promise<HistorialResumen> => {
+  return getAnimalBridge().getHistorialResumen(id);
 };
 
 export const getAnimalesByEstado = (estado: AnimalEstado): Promise<AnimalModel[]> => {
@@ -89,6 +100,8 @@ export const AnimalModule = {
   logEvent,
   insertAnimal,
   listAnimals,
+  getAnimalById,
+  getHistorialResumen,
   getAnimalesByEstado,
   buscarPorArete,
   updateAnimal,

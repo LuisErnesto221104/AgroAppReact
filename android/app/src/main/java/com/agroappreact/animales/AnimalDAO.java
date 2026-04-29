@@ -31,6 +31,9 @@ public class AnimalDAO {
                 values.put(DatabaseHelper.COL_PESO, peso);
             }
             values.put(DatabaseHelper.COL_FOTO, fotoPath);
+            values.put(DatabaseHelper.COL_ESTADO, "ACTIVO");
+            values.putNull(DatabaseHelper.COL_FECHA_BAJA);
+            values.putNull(DatabaseHelper.COL_MOTIVO_BAJA);
 
             long id = db.insertOrThrow(DatabaseHelper.TABLE_ANIMALES, null, values);
             db.setTransactionSuccessful();
@@ -148,6 +151,60 @@ public class AnimalDAO {
         }
     }
 
+    public List<AnimalRecord> getAnimalesByEstado(String estado) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        ensureAnimalesSchema(db);
+
+        List<AnimalRecord> animals = new ArrayList<>();
+        Cursor cursor = db.query(
+                DatabaseHelper.TABLE_ANIMALES,
+                null,
+                DatabaseHelper.COL_ESTADO + "=?",
+                new String[]{estado},
+                null,
+                null,
+                DatabaseHelper.COL_ID + " DESC"
+        );
+
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    animals.add(fromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+            return animals;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public int changeEstado(long id, String estado, String fechaBaja, String motivoBaja, String updatedAt) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ensureAnimalesSchema(db);
+
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COL_ESTADO, estado);
+            values.put(DatabaseHelper.COL_FECHA_BAJA, fechaBaja);
+            values.put(DatabaseHelper.COL_MOTIVO_BAJA, motivoBaja);
+            values.put(DatabaseHelper.COL_UPDATED_AT, updatedAt);
+
+            int rows = db.update(
+                    DatabaseHelper.TABLE_ANIMALES,
+                    values,
+                    DatabaseHelper.COL_ID + "=?",
+                    new String[]{String.valueOf(id)}
+            );
+            db.setTransactionSuccessful();
+            return rows;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     private AnimalRecord fromCursor(Cursor cursor) {
         AnimalRecord record = new AnimalRecord();
         record.id = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ID));
@@ -166,6 +223,23 @@ public class AnimalDAO {
             record.foto = cursor.getString(fotoColumnIndex);
         }
 
+        int estadoColumnIndex = cursor.getColumnIndex(DatabaseHelper.COL_ESTADO);
+        if (estadoColumnIndex != -1 && !cursor.isNull(estadoColumnIndex)) {
+            record.estado = cursor.getString(estadoColumnIndex);
+        } else {
+            record.estado = "ACTIVO";
+        }
+
+        int fechaBajaColumnIndex = cursor.getColumnIndex(DatabaseHelper.COL_FECHA_BAJA);
+        if (fechaBajaColumnIndex != -1 && !cursor.isNull(fechaBajaColumnIndex)) {
+            record.fechaBaja = cursor.getString(fechaBajaColumnIndex);
+        }
+
+        int motivoBajaColumnIndex = cursor.getColumnIndex(DatabaseHelper.COL_MOTIVO_BAJA);
+        if (motivoBajaColumnIndex != -1 && !cursor.isNull(motivoBajaColumnIndex)) {
+            record.motivoBaja = cursor.getString(motivoBajaColumnIndex);
+        }
+
         return record;
     }
 
@@ -173,6 +247,9 @@ public class AnimalDAO {
         db.execSQL(DatabaseHelper.animalesDDL());
 
         boolean hasUpdatedAt = false;
+        boolean hasEstado = false;
+        boolean hasFechaBaja = false;
+        boolean hasMotivoBaja = false;
         Cursor cursor = db.rawQuery("PRAGMA table_info(" + DatabaseHelper.TABLE_ANIMALES + ")", null);
         try {
             if (cursor.moveToFirst()) {
@@ -180,7 +257,15 @@ public class AnimalDAO {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     if (DatabaseHelper.COL_UPDATED_AT.equals(name)) {
                         hasUpdatedAt = true;
-                        break;
+                    }
+                    if (DatabaseHelper.COL_ESTADO.equals(name)) {
+                        hasEstado = true;
+                    }
+                    if (DatabaseHelper.COL_FECHA_BAJA.equals(name)) {
+                        hasFechaBaja = true;
+                    }
+                    if (DatabaseHelper.COL_MOTIVO_BAJA.equals(name)) {
+                        hasMotivoBaja = true;
                     }
                 } while (cursor.moveToNext());
             }
@@ -194,6 +279,27 @@ public class AnimalDAO {
                             " ADD COLUMN " + DatabaseHelper.COL_UPDATED_AT + " TEXT"
             );
         }
+
+        if (!hasEstado) {
+            db.execSQL(
+                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                            " ADD COLUMN " + DatabaseHelper.COL_ESTADO + " TEXT DEFAULT 'ACTIVO'"
+            );
+        }
+
+        if (!hasFechaBaja) {
+            db.execSQL(
+                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                            " ADD COLUMN " + DatabaseHelper.COL_FECHA_BAJA + " TEXT"
+            );
+        }
+
+        if (!hasMotivoBaja) {
+            db.execSQL(
+                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                            " ADD COLUMN " + DatabaseHelper.COL_MOTIVO_BAJA + " TEXT"
+            );
+        }
     }
 
     public static class AnimalRecord {
@@ -204,5 +310,8 @@ public class AnimalDAO {
         public String fecha;
         public Double peso;
         public String foto;
+        public String estado;
+        public String fechaBaja;
+        public String motivoBaja;
     }
 }

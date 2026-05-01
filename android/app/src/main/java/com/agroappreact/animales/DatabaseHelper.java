@@ -16,6 +16,7 @@ public final class DatabaseHelper {
     public static final String COL_NOMBRE = "nombre";
     public static final String COL_ESTADO = "estado";
     public static final String COL_OBSERVACIONES = "observaciones";
+    public static final String IDX_ARETE = "idx_animales_arete";
 
     private DatabaseHelper() {
     }
@@ -36,5 +37,10 @@ public final class DatabaseHelper {
                 COL_ESTADO + " TEXT DEFAULT 'ACTIVO', " +
                 COL_OBSERVACIONES + " TEXT" +
                 ")";
+    }
+
+    public static String areteIndexDDL() {
+        return "CREATE INDEX IF NOT EXISTS " + IDX_ARETE +
+                " ON " + TABLE_ANIMALES + "(" + COL_ARETE + ")";
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteConstraintException;
 import android.net.Uri;
+import android.util.Log;
 
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.utils.AreteValidator;
@@ -22,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,9 +36,14 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     private static final String ERR_NOT_FOUND = "ERR_ANIMAL_NOT_FOUND";
     private static final String ERR_ESTADO_FINAL = "ERR_ESTADO_FINAL";
     private static final String ERR_ESTADO_TRANSITION = "ERR_ESTADO_TRANSITION";
+    private static final long SEARCH_CACHE_WINDOW_MS = 500;
 
     private final AnimalDAO animalDAO;
     private final ExecutorService executorService;
+    private final Object searchCacheLock = new Object();
+    private String lastSearchKey;
+    private long lastSearchAtMs;
+    private List<AnimalDAO.AnimalRecord> lastSearchResult;
 
     public AnimalModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -206,6 +213,61 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                 promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
             } catch (Exception e) {
                 promise.reject("ANIMAL_LIST_ERROR", "No se pudo obtener animales por estado: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
+    public void logEvent(String event) {
+        Log.d("AGROAPP", "EVENT: " + event);
+    }
+
+    @ReactMethod
+    public void buscarPorArete(String termino, String estado, Promise promise) {
+        String normalizedEstado;
+        try {
+            normalizedEstado = normalizeEstado(estado);
+        } catch (IllegalArgumentException e) {
+            promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
+            return;
+        }
+
+        String normalizedTermino = termino == null ? "" : termino.trim();
+        String searchKey = normalizedEstado + "::" + normalizedTermino;
+        long now = System.currentTimeMillis();
+
+        synchronized (searchCacheLock) {
+            boolean withinCacheWindow = now - lastSearchAtMs <= SEARCH_CACHE_WINDOW_MS;
+            if (searchKey.equals(lastSearchKey) && withinCacheWindow && lastSearchResult != null) {
+                Log.d("AGROAPP", "buscarPorArete CACHE HIT key=" + searchKey + " rows=" + lastSearchResult.size());
+                promise.resolve(toWritableArray(lastSearchResult));
+                return;
+            }
+        }
+
+        Log.d("AGROAPP", "buscarPorArete INICIO termino=" + normalizedTermino + " estado=" + normalizedEstado);
+        executorService.execute(() -> {
+            Log.d("AGROAPP", "buscarPorArete HILO INICIADO");
+            try {
+                Log.d("AGROAPP", "buscarPorArete llamando DAO...");
+                List<AnimalDAO.AnimalRecord> animals = animalDAO.buscarPorAreteYEstado(normalizedTermino, normalizedEstado);
+                Log.d("AGROAPP", "buscarPorArete DAO retorno: " + animals.size() + " animales");
+
+                synchronized (searchCacheLock) {
+                    lastSearchKey = searchKey;
+                    lastSearchAtMs = System.currentTimeMillis();
+                    lastSearchResult = new ArrayList<>(animals);
+                }
+
+                WritableArray result = toWritableArray(animals);
+                Log.d("AGROAPP", "buscarPorArete resolviendo promesa OK");
+                promise.resolve(result);
+            } catch (IllegalArgumentException e) {
+                Log.e("AGROAPP", "buscarPorArete VALIDATION ERROR: " + e.getMessage());
+                promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
+            } catch (Throwable t) {
+                Log.e("AGROAPP", "buscarPorArete ERROR: " + t.getClass().getSimpleName() + " - " + t.getMessage(), t);
+                promise.reject("ANIMAL_LIST_ERROR", t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
             }
         });
     }
@@ -387,6 +449,14 @@ public class AnimalModule extends ReactContextBaseJavaModule {
             map.putString("motivo_baja", record.motivoBaja);
         }
         return map;
+    }
+
+    private WritableArray toWritableArray(List<AnimalDAO.AnimalRecord> records) {
+        WritableArray array = Arguments.createArray();
+        for (AnimalDAO.AnimalRecord record : records) {
+            array.pushMap(toWritableMap(record));
+        }
+        return array;
     }
 
     private String normalizeEstado(String estado) {

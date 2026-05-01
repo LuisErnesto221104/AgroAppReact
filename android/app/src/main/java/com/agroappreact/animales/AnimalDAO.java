@@ -180,6 +180,34 @@ public class AnimalDAO {
         }
     }
 
+    public List<AnimalRecord> buscarPorAreteYEstado(String termino, String estado) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        ensureAnimalesSchema(db);
+
+        String normalizedTermino = termino == null ? "" : termino.trim();
+        List<AnimalRecord> animals = new ArrayList<>();
+        Cursor cursor = db.rawQuery(
+                "SELECT * FROM " + DatabaseHelper.TABLE_ANIMALES +
+                        " WHERE " + DatabaseHelper.COL_ARETE + " LIKE '%'||?||'%'" +
+                        " AND " + DatabaseHelper.COL_ESTADO + "=?" +
+                        " ORDER BY " + DatabaseHelper.COL_ID + " DESC",
+                new String[]{normalizedTermino, estado}
+        );
+
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    animals.add(fromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+            return animals;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
     public int changeEstado(long id, String estado, String fechaBaja, String motivoBaja, String updatedAt) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
@@ -300,6 +328,8 @@ public class AnimalDAO {
                             " ADD COLUMN " + DatabaseHelper.COL_MOTIVO_BAJA + " TEXT"
             );
         }
+
+        db.execSQL(DatabaseHelper.areteIndexDDL());
     }
 
     public static class AnimalRecord {

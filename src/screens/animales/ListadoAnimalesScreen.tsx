@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,59 +10,77 @@ import {
 } from 'react-native';
 
 import { EstadoBadge } from '../../components/animales/EstadoBadge';
+import { AnimalSearchBar } from '../../components/animales/AnimalSearchBar';
+import { useSearch } from '../../hooks/useSearch';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalEstado, AnimalModel } from '../../types/Animal';
 
 type ListadoAnimalesScreenProps = {
-  reloadToken: number;
   onBackHome: () => void;
   onCreateAnimal: () => void;
   onOpenDetail: (animal: AnimalModel) => void;
 };
 
 export function ListadoAnimalesScreen({
-  reloadToken,
   onBackHome,
   onCreateAnimal,
   onOpenDetail,
 }: ListadoAnimalesScreenProps) {
   const [estadoFiltro, setEstadoFiltro] = useState<AnimalEstado>('ACTIVO');
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useSearch(searchTerm);
   const [animals, setAnimals] = useState<AnimalModel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const loadAnimals = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setError(null);
+    setRefreshing(true);
+
+    try {
+      const rows = await AnimalModule.listAnimals();
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setAnimals(rows);
+    } catch (loadError) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const message =
+        loadError instanceof Error ? loadError.message : 'No se pudo cargar el listado de animales.';
+      setError(message);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setInitialLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
+    void loadAnimals();
+  }, [loadAnimals]);
 
-    const loadAnimals = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const rows = await AnimalModule.getAnimalesByEstado(estadoFiltro);
-        if (!mounted) {
-          return;
-        }
-        setAnimals(rows);
-      } catch (loadError) {
-        if (!mounted) {
-          return;
-        }
-        const message =
-          loadError instanceof Error ? loadError.message : 'No se pudo cargar el listado de animales.';
-        setError(message);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
+  const visibleAnimals = useMemo(() => {
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
 
-    loadAnimals();
+    return animals.filter(item => {
+      const matchesEstado = item.estado === estadoFiltro;
+      const matchesSearch =
+        normalizedSearch.length === 0 || String(item.arete).toLowerCase().includes(normalizedSearch);
 
-    return () => {
-      mounted = false;
-    };
-  }, [reloadToken, estadoFiltro]);
+      return matchesEstado && matchesSearch;
+    });
+  }, [animals, estadoFiltro, debouncedSearch]);
+
+  const onRefresh = useCallback(() => {
+    void loadAnimals();
+  }, [loadAnimals]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -81,6 +99,7 @@ export function ListadoAnimalesScreen({
       </View>
 
       <View style={styles.selectorWrap}>
+        <AnimalSearchBar value={searchTerm} onSearch={setSearchTerm} />
         <Text style={styles.selectorTitle}>Filtrar por estado</Text>
         <View style={styles.selectorRow}>
           {(['ACTIVO', 'VENDIDO', 'FALLECIDO'] as AnimalEstado[]).map(estado => {
@@ -98,24 +117,26 @@ export function ListadoAnimalesScreen({
         </View>
       </View>
 
-      {loading ? (
+      {initialLoading && animals.length === 0 ? (
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#2f5d3a" />
           <Text style={styles.centerStateText}>Cargando animales...</Text>
         </View>
       ) : null}
 
-      {!loading && error ? (
+      {!initialLoading && error ? (
         <View style={styles.centerState}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
 
-      {!loading && !error ? (
+      {!initialLoading && !error ? (
         <FlatList
-          data={animals}
+          data={visibleAnimals}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={animals.length === 0 ? styles.emptyContainer : styles.listContainer}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          contentContainerStyle={visibleAnimals.length === 0 ? styles.emptyContainer : styles.listContainer}
           ListEmptyComponent={<Text style={styles.emptyText}>No hay animales registrados todavía.</Text>}
           renderItem={({ item }) => (
             <Pressable style={styles.itemCard} onPress={() => onOpenDetail(item)}>
@@ -172,6 +193,7 @@ const styles = StyleSheet.create({
   selectorTitle: {
     color: '#485848',
     fontWeight: '700',
+    marginTop: 10,
     marginBottom: 8,
   },
   selectorRow: {

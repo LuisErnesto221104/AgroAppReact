@@ -32,6 +32,8 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     private static final String ERR_ARETE_DUPLICATE = "ERR_ARETE_DUPLICATE";
     private static final String ERR_ARETE_EMPTY = "ERR_ARETE_EMPTY";
     private static final String ERR_NOT_FOUND = "ERR_ANIMAL_NOT_FOUND";
+    private static final String ERR_ESTADO_FINAL = "ERR_ESTADO_FINAL";
+    private static final String ERR_ESTADO_TRANSITION = "ERR_ESTADO_TRANSITION";
 
     private final AnimalDAO animalDAO;
     private final ExecutorService executorService;
@@ -190,6 +192,82 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void getAnimalesByEstado(String estado, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                String normalizedEstado = normalizeEstado(estado);
+                List<AnimalDAO.AnimalRecord> animals = animalDAO.getAnimalesByEstado(normalizedEstado);
+                WritableArray result = Arguments.createArray();
+                for (AnimalDAO.AnimalRecord animal : animals) {
+                    result.pushMap(toWritableMap(animal));
+                }
+                promise.resolve(result);
+            } catch (IllegalArgumentException e) {
+                promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
+            } catch (Exception e) {
+                promise.reject("ANIMAL_LIST_ERROR", "No se pudo obtener animales por estado: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
+    public void changeEstado(ReadableMap payload, Promise promise) {
+        executorService.execute(() -> {
+            try {
+                if (!payload.hasKey("id") || payload.isNull("id")) {
+                    promise.reject("ANIMAL_VALIDATION_ERROR", "El id del animal es obligatorio.");
+                    return;
+                }
+
+                long id = (long) payload.getDouble("id");
+                AnimalDAO.AnimalRecord current = animalDAO.getAnimalById(id);
+                if (current == null) {
+                    promise.reject(ERR_NOT_FOUND, "No se encontro el animal a actualizar estado.");
+                    return;
+                }
+
+                String currentEstado = normalizeEstado(current.estado);
+                if (isFinalEstado(currentEstado)) {
+                    promise.reject(ERR_ESTADO_FINAL, "El animal ya esta en un estado final y no puede cambiarse.");
+                    return;
+                }
+
+                String targetEstado = normalizeEstado(readRequiredString(payload, "estado"));
+                if (!"ACTIVO".equals(currentEstado) || !"FALLECIDO".equals(targetEstado)) {
+                    promise.reject(ERR_ESTADO_TRANSITION, "Transicion de estado no permitida.");
+                    return;
+                }
+
+                String fechaBaja = readRequiredString(payload, "fecha_baja");
+                String motivoBaja = readRequiredString(payload, "motivo_baja");
+
+                int changedRows = animalDAO.changeEstado(
+                        id,
+                        targetEstado,
+                        fechaBaja,
+                        motivoBaja,
+                        String.valueOf(System.currentTimeMillis())
+                );
+
+                if (changedRows <= 0) {
+                    promise.reject("ANIMAL_UPDATE_ERROR", "No se pudo cambiar el estado del animal.");
+                    return;
+                }
+
+                AnimalDAO.AnimalRecord updated = animalDAO.getAnimalById(id);
+                WritableMap result = Arguments.createMap();
+                result.putBoolean("ok", true);
+                result.putMap("animal", updated == null ? toWritableMap(current) : toWritableMap(updated));
+                promise.resolve(result);
+            } catch (IllegalArgumentException e) {
+                promise.reject("ANIMAL_VALIDATION_ERROR", e.getMessage());
+            } catch (Exception e) {
+                promise.reject("ANIMAL_UPDATE_ERROR", "No se pudo cambiar estado: " + e.getMessage());
+            }
+        });
+    }
+
+    @ReactMethod
     public void deleteAnimal(ReadableMap payload, Promise promise) {
         executorService.execute(() -> {
             try {
@@ -297,7 +375,33 @@ public class AnimalModule extends ReactContextBaseJavaModule {
         } else {
             map.putString("foto", record.foto);
         }
+        map.putString("estado", normalizeEstado(record.estado));
+        if (record.fechaBaja == null) {
+            map.putNull("fecha_baja");
+        } else {
+            map.putString("fecha_baja", record.fechaBaja);
+        }
+        if (record.motivoBaja == null) {
+            map.putNull("motivo_baja");
+        } else {
+            map.putString("motivo_baja", record.motivoBaja);
+        }
         return map;
+    }
+
+    private String normalizeEstado(String estado) {
+        if (estado == null || estado.trim().isEmpty()) {
+            return "ACTIVO";
+        }
+        String normalized = estado.trim().toUpperCase();
+        if (!"ACTIVO".equals(normalized) && !"VENDIDO".equals(normalized) && !"FALLECIDO".equals(normalized)) {
+            throw new IllegalArgumentException("Estado no valido. Usa ACTIVO, VENDIDO o FALLECIDO.");
+        }
+        return normalized;
+    }
+
+    private boolean isFinalEstado(String estado) {
+        return "VENDIDO".equals(estado) || "FALLECIDO".equals(estado);
     }
 
     private InputStream openPhotoInputStream(String sourcePath) throws IOException {

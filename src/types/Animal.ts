@@ -15,7 +15,12 @@ export interface AnimalModel {
   fecha: string;
   peso: number | null;
   foto: string | null;
+  estado: AnimalEstado;
+  fecha_baja: string | null;
+  motivo_baja: string | null;
 }
+
+export type AnimalEstado = 'ACTIVO' | 'VENDIDO' | 'FALLECIDO';
 
 export interface UpdateAnimalPayload {
   id: number;
@@ -50,4 +55,16 @@ export interface UpdateAnimalResult {
 export interface DeleteAnimalResult {
   ok: boolean;
   animalId: number;
+}
+
+export interface ChangeEstadoPayload {
+  id: number;
+  estado: Exclude<AnimalEstado, 'ACTIVO'>;
+  fecha_baja: string;
+  motivo_baja: string;
+}
+
+export interface ChangeEstadoResult {
+  ok: boolean;
+  animal: AnimalModel;
 }

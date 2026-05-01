@@ -36,6 +36,7 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
         onBack={() => setRoute({ name: 'list' })}
         onEdit={animal => setRoute({ name: 'edit', animal })}
         onDeleted={refreshList}
+        onUpdated={refreshList}
       />
     );
   }

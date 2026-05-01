@@ -10,6 +10,7 @@ public final class DatabaseHelper {
     public static final String COL_FECHA = "fecha_registro";
     public static final String COL_PESO = "peso";
     public static final String COL_FOTO = "foto";
+    public static final String COL_UPDATED_AT = "updated_at";
     public static final String COL_NOMBRE = "nombre";
     public static final String COL_ESTADO = "estado";
     public static final String COL_OBSERVACIONES = "observaciones";
@@ -26,6 +27,7 @@ public final class DatabaseHelper {
                 COL_FECHA + " TEXT NOT NULL, " +
                 COL_PESO + " REAL, " +
                 COL_FOTO + " TEXT, " +
+                COL_UPDATED_AT + " TEXT, " +
                 COL_NOMBRE + " TEXT, " +
                 COL_ESTADO + " TEXT DEFAULT 'ACTIVO', " +
                 COL_OBSERVACIONES + " TEXT" +

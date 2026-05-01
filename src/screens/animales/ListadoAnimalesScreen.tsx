@@ -9,8 +9,9 @@ import {
   View,
 } from 'react-native';
 
+import { EstadoBadge } from '../../components/animales/EstadoBadge';
 import { AnimalModule } from '../../native/AnimalModule';
-import { AnimalModel } from '../../types/Animal';
+import { AnimalEstado, AnimalModel } from '../../types/Animal';
 
 type ListadoAnimalesScreenProps = {
   reloadToken: number;
@@ -25,6 +26,7 @@ export function ListadoAnimalesScreen({
   onCreateAnimal,
   onOpenDetail,
 }: ListadoAnimalesScreenProps) {
+  const [estadoFiltro, setEstadoFiltro] = useState<AnimalEstado>('ACTIVO');
   const [animals, setAnimals] = useState<AnimalModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function ListadoAnimalesScreen({
       try {
         setLoading(true);
         setError(null);
-        const rows = await AnimalModule.listAnimals();
+        const rows = await AnimalModule.getAnimalesByEstado(estadoFiltro);
         if (!mounted) {
           return;
         }
@@ -60,7 +62,7 @@ export function ListadoAnimalesScreen({
     return () => {
       mounted = false;
     };
-  }, [reloadToken]);
+  }, [reloadToken, estadoFiltro]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -76,6 +78,24 @@ export function ListadoAnimalesScreen({
         <Pressable style={styles.ghostButton} onPress={onBackHome}>
           <Text style={styles.ghostButtonText}>Volver al inicio</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.selectorWrap}>
+        <Text style={styles.selectorTitle}>Filtrar por estado</Text>
+        <View style={styles.selectorRow}>
+          {(['ACTIVO', 'VENDIDO', 'FALLECIDO'] as AnimalEstado[]).map(estado => {
+            const selected = estadoFiltro === estado;
+            return (
+              <Pressable
+                key={estado}
+                style={[styles.selectorChip, selected && styles.selectorChipSelected]}
+                onPress={() => setEstadoFiltro(estado)}
+              >
+                <EstadoBadge estado={estado} />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {loading ? (
@@ -104,6 +124,9 @@ export function ListadoAnimalesScreen({
                 <Text style={styles.metaText}>Especie: {item.especie}</Text>
                 <Text style={styles.metaText}>Sexo: {item.sexo}</Text>
                 <Text style={styles.metaText}>Fecha ingreso: {item.fecha}</Text>
+                <View style={styles.itemEstadoWrap}>
+                  <EstadoBadge estado={item.estado} />
+                </View>
               </View>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
@@ -140,7 +163,34 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 8,
+    paddingBottom: 6,
+  },
+  selectorWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  selectorTitle: {
+    color: '#485848',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  selectorChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d6ded0',
+    padding: 4,
+    backgroundColor: '#ffffff',
+  },
+  selectorChipSelected: {
+    borderColor: '#2f5d3a',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
   primaryButton: {
     flex: 1,
@@ -217,6 +267,9 @@ const styles = StyleSheet.create({
     color: '#4f5f50',
     fontWeight: '600',
     fontSize: 12,
+  },
+  itemEstadoWrap: {
+    marginTop: 7,
   },
   chevron: {
     color: '#2f5d3a',

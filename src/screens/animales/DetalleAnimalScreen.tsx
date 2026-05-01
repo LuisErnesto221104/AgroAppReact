@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+import { EstadoBadge } from '../../components/animales/EstadoBadge';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel } from '../../types/Animal';
 
@@ -9,9 +10,16 @@ type DetalleAnimalScreenProps = {
   onBack: () => void;
   onEdit: (animal: AnimalModel) => void;
   onDeleted: () => void;
+  onUpdated: () => void;
 };
 
-export function DetalleAnimalScreen({ animal, onBack, onEdit, onDeleted }: DetalleAnimalScreenProps) {
+export function DetalleAnimalScreen({
+  animal,
+  onBack,
+  onEdit,
+  onDeleted,
+}: DetalleAnimalScreenProps) {
+  const [currentAnimal, setCurrentAnimal] = useState<AnimalModel>(animal);
   const [loadingDelete, setLoadingDelete] = useState(false);
 
   const confirmDelete = () => {
@@ -56,24 +64,45 @@ export function DetalleAnimalScreen({ animal, onBack, onEdit, onDeleted }: Detal
       <View style={styles.body}>
         <View style={styles.card}>
           <Text style={styles.label}>Arete</Text>
-          <Text style={styles.value}>{animal.arete}</Text>
+          <Text style={styles.value}>{currentAnimal.arete}</Text>
+
+          <Text style={styles.label}>Estado</Text>
+          <View style={styles.estadoRow}>
+            <EstadoBadge estado={currentAnimal.estado} />
+          </View>
 
           <Text style={styles.label}>Especie / Raza</Text>
-          <Text style={styles.value}>{animal.especie}</Text>
+          <Text style={styles.value}>{currentAnimal.especie}</Text>
 
           <Text style={styles.label}>Sexo</Text>
-          <Text style={styles.value}>{animal.sexo}</Text>
+          <Text style={styles.value}>{currentAnimal.sexo}</Text>
 
           <Text style={styles.label}>Fecha de ingreso</Text>
-          <Text style={styles.value}>{animal.fecha}</Text>
+          <Text style={styles.value}>{currentAnimal.fecha}</Text>
+
+          {currentAnimal.fecha_baja ? (
+            <>
+              <Text style={styles.label}>Fecha de baja</Text>
+              <Text style={styles.value}>{currentAnimal.fecha_baja}</Text>
+            </>
+          ) : null}
+
+          {currentAnimal.motivo_baja ? (
+            <>
+              <Text style={styles.label}>Motivo / detalle baja</Text>
+              <Text style={styles.value}>{currentAnimal.motivo_baja}</Text>
+            </>
+          ) : null}
 
           <Text style={styles.label}>Peso (kg)</Text>
-          <Text style={styles.value}>{animal.peso ?? 'Sin registro'}</Text>
+          <Text style={styles.value}>{currentAnimal.peso ?? 'Sin registro'}</Text>
         </View>
 
-        <Pressable style={styles.editButton} onPress={() => onEdit(animal)}>
+        <Pressable style={styles.editButton} onPress={() => onEdit(currentAnimal)}>
           <Text style={styles.editButtonText}>Editar animal</Text>
         </Pressable>
+
+        <Text style={styles.estadoHint}>Para marcar como fallecido, usa la pantalla Editar animal.</Text>
 
         <Pressable
           style={[styles.deleteButton, loadingDelete && styles.deleteButtonDisabled]}
@@ -139,6 +168,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 16,
   },
+  estadoRow: {
+    marginTop: 5,
+  },
   editButton: {
     marginTop: 18,
     backgroundColor: '#0f6f35',
@@ -150,6 +182,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
     fontSize: 15,
+  },
+  estadoHint: {
+    marginTop: 10,
+    color: '#5b6b5d',
+    fontWeight: '600',
+    fontSize: 12,
   },
   deleteButton: {
     marginTop: 10,

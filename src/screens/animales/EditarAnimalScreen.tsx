@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { AnimalFotoCaptura } from '../../components/animales/AnimalFotoCaptura';
+import { EstadoBadge } from '../../components/animales/EstadoBadge';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, UpdateAnimalPayload } from '../../types/Animal';
 
@@ -63,6 +64,9 @@ type EditFormState = {
   fecha: string;
   peso: string;
   fotoPath: string | null;
+  estado: 'ACTIVO' | 'FALLECIDO';
+  fechaBaja: string;
+  motivoBaja: string;
 };
 
 export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScreenProps) {
@@ -73,6 +77,9 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     fecha: animal.fecha,
     peso: animal.peso == null ? '' : String(Math.trunc(animal.peso)),
     fotoPath: null,
+    estado: animal.estado === 'FALLECIDO' ? 'FALLECIDO' : 'ACTIVO',
+    fechaBaja: animal.fecha_baja ?? '',
+    motivoBaja: animal.motivo_baja ?? '',
   });
   const [loading, setLoading] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
@@ -81,6 +88,15 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
   });
 
   const canSubmit = useMemo(() => {
+    if (form.estado === 'FALLECIDO') {
+      return (
+        form.especie.trim().length > 0 &&
+        form.sexo.trim().length > 0 &&
+        form.fecha.trim().length > 0 &&
+        form.fechaBaja.trim().length > 0 &&
+        form.motivoBaja.trim().length > 0
+      );
+    }
     return form.especie.trim().length > 0 && form.sexo.trim().length > 0 && form.fecha.trim().length > 0;
   }, [form]);
 
@@ -162,6 +178,16 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     try {
       setLoading(true);
       await AnimalModule.updateAnimal(payload);
+
+      if (animal.estado === 'ACTIVO' && form.estado === 'FALLECIDO') {
+        await AnimalModule.changeEstado({
+          id: animal.id,
+          estado: 'FALLECIDO',
+          fecha_baja: form.fechaBaja.trim(),
+          motivo_baja: form.motivoBaja.trim(),
+        });
+      }
+
       Alert.alert('Actualizado', `Animal ${animal.arete} actualizado correctamente.`);
       onSaved();
     } catch (updateError) {
@@ -185,6 +211,47 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.label}>Numero de Arete SINIIGA *</Text>
         <TextInput value={form.arete} style={[styles.input, styles.inputDisabled]} editable={false} />
+
+        <Text style={styles.label}>Estado</Text>
+        <View style={styles.estadoRow}>
+          <EstadoBadge estado={form.estado} />
+        </View>
+
+        {animal.estado === 'ACTIVO' ? (
+          <Pressable
+            style={[styles.fallecidoToggle, form.estado === 'FALLECIDO' && styles.fallecidoToggleActive]}
+            onPress={() =>
+              setForm(prev => ({
+                ...prev,
+                estado: prev.estado === 'ACTIVO' ? 'FALLECIDO' : 'ACTIVO',
+              }))
+            }
+          >
+            <Text style={styles.fallecidoToggleText}>
+              {form.estado === 'FALLECIDO' ? 'Quitar marca de fallecido' : 'Marcar como fallecido'}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {form.estado === 'FALLECIDO' ? (
+          <>
+            <Text style={styles.label}>Fecha de baja *</Text>
+            <TextInput
+              value={form.fechaBaja}
+              onChangeText={value => setField('fechaBaja', value)}
+              placeholder="YYYY-MM-DD"
+              style={styles.input}
+            />
+
+            <Text style={styles.label}>Causa de fallecimiento *</Text>
+            <TextInput
+              value={form.motivoBaja}
+              onChangeText={value => setField('motivoBaja', value)}
+              placeholder="Describe la causa"
+              style={styles.input}
+            />
+          </>
+        ) : null}
 
         <Text style={styles.label}>Especie / Raza</Text>
         <View style={styles.chipWrap}>
@@ -352,6 +419,26 @@ const styles = StyleSheet.create({
   inputDisabled: {
     backgroundColor: '#ecefe6',
     color: '#5f6e5e',
+  },
+  estadoRow: {
+    marginTop: 4,
+  },
+  fallecidoToggle: {
+    marginTop: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#c5d2c1',
+    backgroundColor: '#ffffff',
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  fallecidoToggleActive: {
+    borderColor: '#9a2f2f',
+    backgroundColor: '#fff4f4',
+  },
+  fallecidoToggleText: {
+    color: '#344b36',
+    fontWeight: '700',
   },
   chipWrap: {
     flexDirection: 'row',

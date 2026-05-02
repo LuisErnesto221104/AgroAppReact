@@ -17,14 +17,25 @@ import { EstadoBadge } from '../../components/animales/EstadoBadge';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, HistorialResumen } from '../../types/Animal';
 
+const formatSexo = (sexo: string | null | undefined) => {
+  if (!sexo) {
+    return 'Sin dato';
+  }
+  if (sexo === 'F') {
+    return 'H';
+  }
+  return sexo;
+};
+
 type DetalleAnimalScreenProps = {
   animalId: number;
+  refreshToken: number;
   onBack: () => void;
   onEdit: (animal: AnimalModel) => void;
   onDeleted: () => void;
 };
 
-export function DetalleAnimalScreen({ animalId, onBack, onEdit, onDeleted }: DetalleAnimalScreenProps) {
+export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, onDeleted }: DetalleAnimalScreenProps) {
   const [currentAnimal, setCurrentAnimal] = useState<AnimalModel | null>(null);
   const [historial, setHistorial] = useState<HistorialResumen>({
     historial_peso: [],
@@ -59,7 +70,7 @@ export function DetalleAnimalScreen({ animalId, onBack, onEdit, onDeleted }: Det
 
   useEffect(() => {
     void loadDetalle();
-  }, [loadDetalle]);
+  }, [loadDetalle, refreshToken]);
 
   const photoSource = useMemo(() => {
     if (!currentAnimal?.foto || photoLoadFailed) {
@@ -69,11 +80,11 @@ export function DetalleAnimalScreen({ animalId, onBack, onEdit, onDeleted }: Det
     if (!raw || raw === 'null' || raw === 'undefined') {
       return null;
     }
-    if (raw.startsWith('file://') || raw.startsWith('content://') || raw.startsWith('http')) {
-      return { uri: raw };
-    }
-    return { uri: `file://${raw}` };
-  }, [currentAnimal?.foto, photoLoadFailed]);
+    const baseUri = raw.startsWith('file://') || raw.startsWith('content://') || raw.startsWith('http')
+      ? raw
+      : `file://${raw}`;
+    return { uri: `${baseUri}?v=${refreshToken}` };
+  }, [currentAnimal?.foto, photoLoadFailed, refreshToken]);
 
   const animalDisplayName = useMemo(() => {
     if (!currentAnimal) {
@@ -155,6 +166,7 @@ export function DetalleAnimalScreen({ animalId, onBack, onEdit, onDeleted }: Det
           <View style={styles.summaryPhotoWrap}>
             {photoSource ? (
               <Image
+                key={`${currentAnimal.id}-${currentAnimal.foto ?? 'nofoto'}-${refreshToken}`}
                 source={photoSource}
                 style={styles.summaryPhoto}
                 resizeMode="cover"
@@ -185,7 +197,7 @@ export function DetalleAnimalScreen({ animalId, onBack, onEdit, onDeleted }: Det
             </View>
             <View style={styles.infoCell}>
               <Text style={styles.infoLabel}>Sexo</Text>
-              <Text style={styles.infoValue}>{currentAnimal.sexo || 'Sin dato'}</Text>
+              <Text style={styles.infoValue}>{formatSexo(currentAnimal.sexo)}</Text>
             </View>
           </View>
 

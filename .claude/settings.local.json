@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adb devices *)",
+      "Bash(/home/ernesto/Android/Sdk/platform-tools/adb devices *)",
+      "Bash(npx --version)"
+    ]
+  }
+}

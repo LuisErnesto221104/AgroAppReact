@@ -208,6 +208,70 @@ public class AnimalDAO {
         }
     }
 
+    public List<PesoRecord> getHistorialPeso(long animalId, int limit) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        ensureAnimalesSchema(db);
+        ensureHistorialResumenSchema(db);
+
+        int safeLimit = limit <= 0 ? 10 : limit;
+        List<PesoRecord> historial = new ArrayList<>();
+        Cursor cursor = db.rawQuery(
+                "SELECT fecha, peso FROM historial_peso WHERE animal_id=? ORDER BY fecha DESC LIMIT " + safeLimit,
+                new String[]{String.valueOf(animalId)}
+        );
+
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    PesoRecord record = new PesoRecord();
+                    record.fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha"));
+                    record.peso = cursor.getDouble(cursor.getColumnIndexOrThrow("peso"));
+                    historial.add(record);
+                } while (cursor.moveToNext());
+            }
+            return historial;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public List<EventoRecord> getEventosRecientes(long animalId, int limit) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        ensureAnimalesSchema(db);
+        ensureHistorialResumenSchema(db);
+
+        int safeLimit = limit <= 0 ? 10 : limit;
+        List<EventoRecord> eventos = new ArrayList<>();
+        Cursor cursor = db.rawQuery(
+                "SELECT id, fecha, enfermedad, sintomas, tratamiento, estado, observaciones " +
+                        "FROM historial_clinico WHERE animal_id=? ORDER BY fecha DESC LIMIT " + safeLimit,
+                new String[]{String.valueOf(animalId)}
+        );
+
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    EventoRecord record = new EventoRecord();
+                    record.id = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
+                    record.fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha"));
+                    record.enfermedad = cursor.getString(cursor.getColumnIndexOrThrow("enfermedad"));
+                    record.sintomas = cursor.getString(cursor.getColumnIndexOrThrow("sintomas"));
+                    record.tratamiento = cursor.getString(cursor.getColumnIndexOrThrow("tratamiento"));
+                    record.estado = cursor.getString(cursor.getColumnIndexOrThrow("estado"));
+                    record.observaciones = cursor.getString(cursor.getColumnIndexOrThrow("observaciones"));
+                    eventos.add(record);
+                } while (cursor.moveToNext());
+            }
+            return eventos;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
     public int changeEstado(long id, String estado, String fechaBaja, String motivoBaja, String updatedAt) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
@@ -332,6 +396,35 @@ public class AnimalDAO {
         db.execSQL(DatabaseHelper.areteIndexDDL());
     }
 
+    private void ensureHistorialResumenSchema(SQLiteDatabase db) {
+        db.execSQL(
+                "CREATE TABLE IF NOT EXISTS historial_peso (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "animal_id INTEGER NOT NULL, " +
+                        "fecha TEXT NOT NULL, " +
+                        "peso REAL NOT NULL, " +
+                        "observaciones TEXT, " +
+                        "FOREIGN KEY(animal_id) REFERENCES " + DatabaseHelper.TABLE_ANIMALES + "(" + DatabaseHelper.COL_ID + ") ON DELETE CASCADE" +
+                        ")"
+        );
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_historial_peso_animal_fecha ON historial_peso(animal_id, fecha DESC)");
+
+        db.execSQL(
+                "CREATE TABLE IF NOT EXISTS historial_clinico (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "animal_id INTEGER NOT NULL, " +
+                        "fecha TEXT, " +
+                        "enfermedad TEXT, " +
+                        "sintomas TEXT, " +
+                        "tratamiento TEXT, " +
+                        "estado TEXT, " +
+                        "observaciones TEXT, " +
+                        "FOREIGN KEY(animal_id) REFERENCES " + DatabaseHelper.TABLE_ANIMALES + "(" + DatabaseHelper.COL_ID + ") ON DELETE CASCADE" +
+                        ")"
+        );
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_historial_clinico_animal_fecha ON historial_clinico(animal_id, fecha DESC)");
+    }
+
     public static class AnimalRecord {
         public long id;
         public String arete;
@@ -343,5 +436,20 @@ public class AnimalDAO {
         public String estado;
         public String fechaBaja;
         public String motivoBaja;
+    }
+
+    public static class PesoRecord {
+        public String fecha;
+        public double peso;
+    }
+
+    public static class EventoRecord {
+        public long id;
+        public String fecha;
+        public String enfermedad;
+        public String sintomas;
+        public String tratamiento;
+        public String estado;
+        public String observaciones;
     }
 }

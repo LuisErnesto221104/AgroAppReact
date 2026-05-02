@@ -68,3 +68,23 @@ export interface ChangeEstadoResult {
   ok: boolean;
   animal: AnimalModel;
 }
+
+export interface PesoHistorialPoint {
+  fecha: string;
+  peso: number;
+}
+
+export interface EventoSanitarioResumen {
+  id: number;
+  fecha: string | null;
+  enfermedad: string | null;
+  sintomas: string | null;
+  tratamiento: string | null;
+  estado: string | null;
+  observaciones: string | null;
+}
+
+export interface HistorialResumen {
+  historial_peso: PesoHistorialPoint[];
+  eventos_recientes: EventoSanitarioResumen[];
+}

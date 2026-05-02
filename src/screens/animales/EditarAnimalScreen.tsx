@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 
 import { AnimalFotoCaptura } from '../../components/animales/AnimalFotoCaptura';
-import { EstadoBadge } from '../../components/animales/EstadoBadge';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, UpdateAnimalPayload } from '../../types/Animal';
 
@@ -203,18 +202,52 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>Cancelar</Text>
+          <Text style={styles.backText}>←</Text>
         </Pressable>
-        <Text style={styles.title}>Editar Animal</Text>
+        <View>
+          <Text style={styles.title}>Editar Animal</Text>
+          <Text style={styles.subtitle}>La {animal.especie} • #{animal.arete}</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.label}>Numero de Arete SINIIGA *</Text>
+        <Text style={styles.label}>Número de Arete SINIIGA 🔒</Text>
         <TextInput value={form.arete} style={[styles.input, styles.inputDisabled]} editable={false} />
+        <Text style={styles.helperText}>El arete oficial no se puede modificar</Text>
 
-        <Text style={styles.label}>Estado</Text>
-        <View style={styles.estadoRow}>
-          <EstadoBadge estado={form.estado} />
+        <Text style={styles.label}>Estado actual del animal *</Text>
+        <View style={styles.estadoSelectorRow}>
+          <Pressable
+            style={[styles.estadoSelectorChip, form.estado === 'ACTIVO' && styles.estadoSelectorChipActive]}
+            onPress={() => setField('estado', 'ACTIVO')}
+          >
+            <Text
+              style={[
+                styles.estadoSelectorText,
+                form.estado === 'ACTIVO' && styles.estadoSelectorTextActive,
+              ]}
+            >
+              🟢 Activo
+            </Text>
+          </Pressable>
+
+          <View style={[styles.estadoSelectorChip, styles.estadoSelectorChipDisabled]}>
+            <Text style={styles.estadoSelectorTextDisabled}>🟠 Vendido</Text>
+          </View>
+
+          <Pressable
+            style={[styles.estadoSelectorChip, form.estado === 'FALLECIDO' && styles.estadoSelectorChipFallecido]}
+            onPress={() => setField('estado', 'FALLECIDO')}
+          >
+            <Text
+              style={[
+                styles.estadoSelectorText,
+                form.estado === 'FALLECIDO' && styles.estadoSelectorTextFallecido,
+              ]}
+            >
+              🟣 Fallecido
+            </Text>
+          </Pressable>
         </View>
 
         {animal.estado === 'ACTIVO' ? (
@@ -253,7 +286,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           </>
         ) : null}
 
-        <Text style={styles.label}>Especie / Raza</Text>
+        <Text style={styles.label}>Nombre / Alias</Text>
         <View style={styles.chipWrap}>
           {ESPECIES_OPTIONS.map(option => {
             const selected = form.especie === option;
@@ -287,7 +320,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           })}
         </View>
 
-        <Text style={styles.label}>Fecha de ingreso</Text>
+        <Text style={styles.label}>Fecha de Nacimiento</Text>
         <Pressable style={styles.dateField} onPress={openCalendar}>
           <Text style={[styles.dateFieldText, !form.fecha && styles.dateFieldPlaceholder]}>
             {form.fecha || 'Selecciona una fecha'}
@@ -295,7 +328,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           <Text style={styles.dateFieldIcon}>📅</Text>
         </Pressable>
 
-        <Text style={styles.label}>Peso (kg)</Text>
+        <Text style={styles.label}>Peso actual (kg)</Text>
         <TextInput
           value={form.peso}
           onChangeText={value => setField('peso', sanitizeDigits(value))}
@@ -372,63 +405,116 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f1e7',
+    backgroundColor: '#ececec',
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    backgroundColor: '#2f5d3a',
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: '#0a6b33',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: '#e8edd8',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
-    color: '#2f5d3a',
+    color: '#ffffff',
+    fontSize: 18,
     fontWeight: '700',
   },
   title: {
-    marginTop: 12,
     color: '#ffffff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
   },
+  subtitle: {
+    marginTop: 2,
+    color: '#d5e8d8',
+    fontWeight: '600',
+    fontSize: 12,
+  },
   container: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 28,
   },
   label: {
     marginBottom: 6,
     marginTop: 10,
-    color: '#1c2b1d',
+    color: '#1d1d1d',
     fontWeight: '700',
+  },
+  helperText: {
+    marginTop: 4,
+    color: '#7d7d7d',
+    fontSize: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#b6c7a0',
+    borderColor: '#d8d8d8',
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f0f0f0',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#1c2b1d',
+    color: '#1f1f1f',
   },
   inputDisabled: {
-    backgroundColor: '#ecefe6',
-    color: '#5f6e5e',
+    backgroundColor: '#e8e8e8',
+    color: '#646464',
   },
-  estadoRow: {
-    marginTop: 4,
+  estadoSelectorRow: {
+    marginTop: 2,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  estadoSelectorChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d5d5d5',
+    borderRadius: 999,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  estadoSelectorChipActive: {
+    borderColor: '#0a6b33',
+    backgroundColor: '#0a6b33',
+  },
+  estadoSelectorChipDisabled: {
+    opacity: 0.7,
+  },
+  estadoSelectorChipFallecido: {
+    borderColor: '#9145aa',
+    backgroundColor: '#f6eefa',
+  },
+  estadoSelectorText: {
+    color: '#2a2a2a',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  estadoSelectorTextActive: {
+    color: '#ffffff',
+  },
+  estadoSelectorTextDisabled: {
+    color: '#9b9b9b',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  estadoSelectorTextFallecido: {
+    color: '#7a3a8d',
   },
   fallecidoToggle: {
     marginTop: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#c5d2c1',
-    backgroundColor: '#ffffff',
+    borderColor: '#d2d2d2',
+    backgroundColor: '#f0f0f0',
     paddingVertical: 11,
     alignItems: 'center',
   },
@@ -447,8 +533,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: '#cfd9c3',
-    backgroundColor: '#ffffff',
+    borderColor: '#d7d7d7',
+    backgroundColor: '#f0f0f0',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -467,8 +553,8 @@ const styles = StyleSheet.create({
   },
   sexChip: {
     borderWidth: 1,
-    borderColor: '#cfd9c3',
-    backgroundColor: '#ffffff',
+    borderColor: '#d7d7d7',
+    backgroundColor: '#f0f0f0',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -487,9 +573,9 @@ const styles = StyleSheet.create({
   },
   dateField: {
     borderWidth: 1,
-    borderColor: '#b6c7a0',
+    borderColor: '#d8d8d8',
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f0f0f0',
     paddingHorizontal: 12,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -587,7 +673,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 24,
-    backgroundColor: '#2f5d3a',
+    backgroundColor: '#0a6b33',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',

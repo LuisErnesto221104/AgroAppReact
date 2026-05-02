@@ -115,7 +115,7 @@ export function AnimalFotoCaptura({ rutaLocal, onRutaLocalChange }: AnimalFotoCa
 
       <View style={styles.previewBox}>
         {rutaLocal ? (
-          <Image source={{ uri: rutaLocal }} style={styles.previewImage} resizeMode="cover" />
+          <Image key={rutaLocal} source={{ uri: rutaLocal }} style={styles.previewImage} resizeMode="cover" />
         ) : (
           <Text style={styles.previewPlaceholder}>Sin fotografia capturada</Text>
         )}

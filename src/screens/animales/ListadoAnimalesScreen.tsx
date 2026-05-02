@@ -15,6 +15,16 @@ import { useSearch } from '../../hooks/useSearch';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalEstado, AnimalModel } from '../../types/Animal';
 
+const formatSexo = (sexo: string | null | undefined) => {
+  if (!sexo) {
+    return 'Sin dato';
+  }
+  if (sexo === 'F') {
+    return 'H';
+  }
+  return sexo;
+};
+
 type ListadoAnimalesScreenProps = {
   onBackHome: () => void;
   onCreateAnimal: () => void;
@@ -143,7 +153,7 @@ export function ListadoAnimalesScreen({
               <View>
                 <Text style={styles.arete}>Arete: {item.arete}</Text>
                 <Text style={styles.metaText}>Especie: {item.especie}</Text>
-                <Text style={styles.metaText}>Sexo: {item.sexo}</Text>
+                <Text style={styles.metaText}>Sexo: {formatSexo(item.sexo)}</Text>
                 <Text style={styles.metaText}>Fecha ingreso: {item.fecha}</Text>
                 <View style={styles.itemEstadoWrap}>
                   <EstadoBadge estado={item.estado} />

@@ -321,19 +321,22 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                 }
 
                 String currentEstado = normalizeEstado(current.estado);
-                if (isFinalEstado(currentEstado)) {
-                    promise.reject(ERR_ESTADO_FINAL, "El animal ya esta en un estado final y no puede cambiarse.");
+                if ("VENDIDO".equals(currentEstado)) {
+                    promise.reject(ERR_ESTADO_FINAL, "El animal ya esta vendido y no puede cambiarse.");
                     return;
                 }
 
                 String targetEstado = normalizeEstado(readRequiredString(payload, "estado"));
-                if (!"ACTIVO".equals(currentEstado) || !"FALLECIDO".equals(targetEstado)) {
+                boolean validTransition =
+                        ("ACTIVO".equals(currentEstado) && "FALLECIDO".equals(targetEstado)) ||
+                        ("FALLECIDO".equals(currentEstado) && "ACTIVO".equals(targetEstado));
+                if (!validTransition) {
                     promise.reject(ERR_ESTADO_TRANSITION, "Transicion de estado no permitida.");
                     return;
                 }
 
-                String fechaBaja = readRequiredString(payload, "fecha_baja");
-                String motivoBaja = readRequiredString(payload, "motivo_baja");
+                String fechaBaja = "ACTIVO".equals(targetEstado) ? null : readRequiredString(payload, "fecha_baja");
+                String motivoBaja = "ACTIVO".equals(targetEstado) ? null : readRequiredString(payload, "motivo_baja");
 
                 int changedRows = animalDAO.changeEstado(
                         id,
@@ -568,7 +571,7 @@ public class AnimalModule extends ReactContextBaseJavaModule {
     }
 
     private boolean isFinalEstado(String estado) {
-        return "VENDIDO".equals(estado) || "FALLECIDO".equals(estado);
+        return "VENDIDO".equals(estado);
     }
 
     private InputStream openPhotoInputStream(String sourcePath) throws IOException {

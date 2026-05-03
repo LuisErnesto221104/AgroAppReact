@@ -59,9 +59,9 @@ export interface DeleteAnimalResult {
 
 export interface ChangeEstadoPayload {
   id: number;
-  estado: Exclude<AnimalEstado, 'ACTIVO'>;
-  fecha_baja: string;
-  motivo_baja: string;
+  estado: AnimalEstado;
+  fecha_baja?: string;
+  motivo_baja?: string;
 }
 
 export interface ChangeEstadoResult {

@@ -403,7 +403,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           })}
         </View>
 
-        <Text style={styles.label}>Fecha de Nacimiento</Text>
+        <Text style={styles.label}>Fecha de Ingreso</Text>
         <Pressable style={styles.dateField} onPress={openCalendar}>
           <Text style={[styles.dateFieldText, !form.fecha && styles.dateFieldPlaceholder]}>
             {form.fecha || 'Selecciona una fecha'}

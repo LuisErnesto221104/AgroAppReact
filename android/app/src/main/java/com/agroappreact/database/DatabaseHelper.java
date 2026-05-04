@@ -16,7 +16,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -59,6 +59,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COL_CALENDARIO_ESTADO = "estado";
     public static final String COL_CALENDARIO_HORA = "hora_recordatorio";
     public static final String COL_CALENDARIO_COSTO = "costo";
+
+    // Tabla Eventos Sanitarios
+    public static final String TABLE_EVENTOS_SANITARIOS = "eventos_sanitarios";
+    public static final String COL_EVENTO_SANITARIO_ID = "id";
+    public static final String COL_EVENTO_SANITARIO_ANIMAL_ID = "animal_id";
+    public static final String COL_EVENTO_SANITARIO_TIPO_EVENTO = "tipo_evento";
+    public static final String COL_EVENTO_SANITARIO_DESCRIPCION = "descripcion";
+    public static final String COL_EVENTO_SANITARIO_FECHA_EVENTO = "fecha_evento";
+    public static final String COL_EVENTO_SANITARIO_VETERINARIO = "veterinario";
+    public static final String COL_EVENTO_SANITARIO_DOSIS = "dosis";
+    public static final String COL_EVENTO_SANITARIO_OBSERVACIONES = "observaciones";
+    public static final String COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO = "fecha_proximo_evento";
     
     // Tabla Historial Clínico
     public static final String TABLE_HISTORIAL_CLINICO = "historial_clinico";
@@ -154,6 +166,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 "FOREIGN KEY(" + COL_CALENDARIO_ANIMAL_ID + ") REFERENCES " + 
                 TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
         db.execSQL(createCalendario);
+
+        String createEventosSanitarios = "CREATE TABLE IF NOT EXISTS " + TABLE_EVENTOS_SANITARIOS + " (" +
+            COL_EVENTO_SANITARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            COL_EVENTO_SANITARIO_ANIMAL_ID + " INTEGER NOT NULL, " +
+            COL_EVENTO_SANITARIO_TIPO_EVENTO + " TEXT NOT NULL CHECK(" + COL_EVENTO_SANITARIO_TIPO_EVENTO +
+            " IN ('VACUNA','DESPARASITACION','ENFERMEDAD','CIRUGIA','OTRO')), " +
+            COL_EVENTO_SANITARIO_DESCRIPCION + " TEXT, " +
+            COL_EVENTO_SANITARIO_FECHA_EVENTO + " TEXT NOT NULL, " +
+            COL_EVENTO_SANITARIO_VETERINARIO + " TEXT, " +
+            COL_EVENTO_SANITARIO_DOSIS + " TEXT, " +
+            COL_EVENTO_SANITARIO_OBSERVACIONES + " TEXT, " +
+            COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO + " TEXT, " +
+            "FOREIGN KEY(" + COL_EVENTO_SANITARIO_ANIMAL_ID + ") REFERENCES " +
+            TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
+        db.execSQL(createEventosSanitarios);
         
         // Crear tabla Historial Clínico
         String createHistorial = "CREATE TABLE " + TABLE_HISTORIAL_CLINICO + " (" +
@@ -247,6 +274,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_FECHA_REGISTRO + " TEXT");
             db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_PESO + " REAL");
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_animales_arete_unique ON " + TABLE_ANIMALES + "(" + COL_ANIMAL_ARETE + ")");
+        }
+        if (oldVersion < 9) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_EVENTOS_SANITARIOS + " (" +
+                    COL_EVENTO_SANITARIO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COL_EVENTO_SANITARIO_ANIMAL_ID + " INTEGER NOT NULL, " +
+                    COL_EVENTO_SANITARIO_TIPO_EVENTO + " TEXT NOT NULL CHECK(" + COL_EVENTO_SANITARIO_TIPO_EVENTO +
+                    " IN ('VACUNA','DESPARASITACION','ENFERMEDAD','CIRUGIA','OTRO')), " +
+                    COL_EVENTO_SANITARIO_DESCRIPCION + " TEXT, " +
+                    COL_EVENTO_SANITARIO_FECHA_EVENTO + " TEXT NOT NULL, " +
+                    COL_EVENTO_SANITARIO_VETERINARIO + " TEXT, " +
+                    COL_EVENTO_SANITARIO_DOSIS + " TEXT, " +
+                    COL_EVENTO_SANITARIO_OBSERVACIONES + " TEXT, " +
+                    COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO + " TEXT, " +
+                    "FOREIGN KEY(" + COL_EVENTO_SANITARIO_ANIMAL_ID + ") REFERENCES " +
+                    TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)");
         }
     }
     

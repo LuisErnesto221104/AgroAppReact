@@ -14,6 +14,7 @@ type AgroBridgeNativeModule = {
   getBridgeInfo(): Promise<BridgeInfo>;
   registrarEventoSanitario(datos: InsertEventoPayload): Promise<InsertEventoResult>;
   obtenerEventosSanitarios(animalId: number): Promise<EventoSanitarioModel[]>;
+  getEventosMes(year: number, month: number): Promise<EventoSanitarioModel[]>;
 };
 
 // Obtenemos el modulo, pero no lanzamos error aqui en tiempo de carga.
@@ -49,4 +50,8 @@ export const registrarEventoSanitario = (
 
 export const obtenerEventosSanitarios = (animalId: number): Promise<EventoSanitarioModel[]> => {
   return getBridge().obtenerEventosSanitarios(animalId);
+};
+
+export const obtenerEventosMes = (year: number, month: number): Promise<EventoSanitarioModel[]> => {
+  return getBridge().getEventosMes(year, month);
 };

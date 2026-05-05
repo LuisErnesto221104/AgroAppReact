@@ -324,8 +324,9 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
           <Text style={styles.label}>Dosis</Text>
           <TextInput
             value={form.dosis}
-            onChangeText={value => setField('dosis', value)}
-            placeholder="Ej. 5 ml"
+            onChangeText={value => setField('dosis', value.replace(/\D/g, ''))}
+            placeholder="Ej. 5"
+            keyboardType="number-pad"
             onFocus={() => setFocusedField('dosis')}
             onBlur={() => setFocusedField(null)}
             style={[styles.input, focusedField === 'dosis' && styles.inputFocused]}

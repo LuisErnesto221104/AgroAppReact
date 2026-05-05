@@ -135,6 +135,22 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
         }
     }
 
+    @ReactMethod
+    public void getEventosMes(int year, int month, Promise promise) {
+        try {
+            List<EventoSanitario> eventos = eventoSanitarioDAO.obtenerEventosPorMes(year, month);
+            WritableArray array = Arguments.createArray();
+
+            for (EventoSanitario evento : eventos) {
+                array.pushMap(serializarEvento(evento));
+            }
+
+            promise.resolve(array);
+        } catch (Exception e) {
+            promise.reject("ERR_EVENTOS_MES", e.getMessage(), e);
+        }
+    }
+
     private WritableMap serializarEvento(EventoSanitario evento) {
         WritableMap map = Arguments.createMap();
         map.putInt("id", evento.getId());

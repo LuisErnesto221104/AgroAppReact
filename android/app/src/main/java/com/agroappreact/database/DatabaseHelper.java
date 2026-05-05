@@ -16,7 +16,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 9;
+    private static final int DATABASE_VERSION = 10; // Sprint 3 — RF002: columnas de venta
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -40,11 +40,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COL_ANIMAL_FECHA_SALIDA = "fecha_salida";
     public static final String COL_ANIMAL_PRECIO_COMPRA = "precio_compra";
     public static final String COL_ANIMAL_PRECIO_VENTA = "precio_venta";
+    public static final String COL_ANIMAL_FECHA_VENTA = "fecha_venta"; // Sprint 3 — RF002
     public static final String COL_ANIMAL_FOTO = "foto";
     public static final String COL_ANIMAL_ESTADO = "estado";
     public static final String COL_ANIMAL_OBSERVACIONES = "observaciones";
     public static final String COL_ANIMAL_PESO_NACER = "peso_nacer";
     public static final String COL_ANIMAL_PESO_ACTUAL = "peso_actual";
+    
+    // Aliases para compatibilidad (sin prefijo ANIMAL_)
+    public static final String COL_ID = COL_ANIMAL_ID;
+    public static final String COL_ARETE = COL_ANIMAL_ARETE;
+    public static final String COL_ESTADO = COL_ANIMAL_ESTADO;
+    public static final String COL_FOTO = COL_ANIMAL_FOTO;
+    public static final String COL_FECHA_BAJA = "fecha_baja";
+    public static final String COL_MOTIVO_BAJA = "motivo_baja";
+    public static final String COL_ESPECIE = COL_ANIMAL_ESPECIE;
+    public static final String COL_SEXO = COL_ANIMAL_SEXO;
+    public static final String COL_FECHA = COL_ANIMAL_FECHA_REGISTRO;
+    public static final String COL_PESO = COL_ANIMAL_PESO;
+    public static final String COL_UPDATED_AT = "updated_at";
+    public static final String COL_PRECIO_VENTA = "precio_venta";
+    public static final String COL_FECHA_VENTA = "fecha_venta";
     
     // Tabla Calendario Sanitario
     public static final String TABLE_CALENDARIO_SANITARIO = "calendario_sanitario";
@@ -144,6 +160,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 COL_ANIMAL_FECHA_SALIDA + " TEXT, " +
                 COL_ANIMAL_PRECIO_COMPRA + " REAL, " +
                 COL_ANIMAL_PRECIO_VENTA + " REAL, " +
+                COL_ANIMAL_FECHA_VENTA + " TEXT, " +
                 COL_ANIMAL_ESTADO + " TEXT, " +
                 COL_ANIMAL_OBSERVACIONES + " TEXT, " +
                 COL_ANIMAL_PESO_NACER + " REAL, " +
@@ -290,6 +307,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     "FOREIGN KEY(" + COL_EVENTO_SANITARIO_ANIMAL_ID + ") REFERENCES " +
                     TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)");
         }
+        if (oldVersion < 10) {
+            // Sprint 3 — RF002: columnas de venta
+            db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_FECHA_VENTA + " TEXT DEFAULT NULL;");
+        }
     }
     
     @Override
@@ -400,5 +421,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    public static String animalesDDL() {
+        return "CREATE TABLE IF NOT EXISTS " + TABLE_ANIMALES + " (" +
+                COL_ANIMAL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_ANIMAL_ARETE + " TEXT UNIQUE NOT NULL, " +
+                COL_ANIMAL_ESPECIE + " TEXT NOT NULL, " +
+                COL_ANIMAL_NOMBRE + " TEXT, " +
+                COL_ANIMAL_RAZA + " TEXT, " +
+                COL_ANIMAL_SEXO + " TEXT, " +
+                COL_ANIMAL_FECHA_REGISTRO + " TEXT, " +
+                COL_ANIMAL_PESO + " REAL, " +
+                COL_ANIMAL_FECHA_NACIMIENTO + " TEXT, " +
+                COL_ANIMAL_FECHA_INGRESO + " TEXT, " +
+                COL_ANIMAL_FECHA_SALIDA + " TEXT, " +
+                COL_ANIMAL_PRECIO_COMPRA + " REAL, " +
+                COL_ANIMAL_PRECIO_VENTA + " REAL, " +
+                COL_ANIMAL_FECHA_VENTA + " TEXT, " +
+                COL_ANIMAL_FOTO + " TEXT, " +
+                COL_ANIMAL_ESTADO + " TEXT DEFAULT 'ACTIVO', " +
+                COL_ANIMAL_OBSERVACIONES + " TEXT, " +
+                COL_ANIMAL_PESO_NACER + " REAL, " +
+                COL_ANIMAL_PESO_ACTUAL + " REAL" +
+                ")";
+    }
+
+    public static String areteIndexDDL() {
+        return "CREATE UNIQUE INDEX IF NOT EXISTS idx_arete ON " + TABLE_ANIMALES + " (" + COL_ANIMAL_ARETE + ")";
     }
 }

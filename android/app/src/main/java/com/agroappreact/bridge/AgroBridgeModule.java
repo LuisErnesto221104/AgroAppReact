@@ -15,6 +15,8 @@ import com.agroappreact.dao.HistorialClinicoDAO;
 import com.agroappreact.dao.HistorialItem;
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.EventoSanitario;
+import com.agroappreact.services.SanitarioCicloNOM041;
+import com.agroappreact.services.InversionCalculadora;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -263,6 +265,34 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             return format.parse(format.format(fecha));
         } catch (ParseException e) {
             return fecha;
+        }
+    }
+
+    @ReactMethod
+    public void calcularProximaFechaNOM(String tipoEvento, String subtipo, String fechaEvento, Promise promise) {
+        try {
+            String proximaFecha = SanitarioCicloNOM041.calcularProximaFecha(tipoEvento, subtipo, fechaEvento);
+            if (proximaFecha != null) {
+                promise.resolve(proximaFecha);
+            } else {
+                promise.reject("INVALID_CYCLE", "Ciclo NOM-041 desconocido para: " + tipoEvento + "/" + subtipo);
+            }
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    // Sprint 3 — RF002: Obtener margen real del animal vendido
+    @ReactMethod
+    public void getMargenRealAnimal(double animalId, Promise promise) {
+        try {
+            android.database.sqlite.SQLiteDatabase db = databaseHelper.getReadableDatabase();
+            WritableMap result = InversionCalculadora.getMargenRealAnimal(db, (long) animalId);
+            promise.resolve(result);
+        } catch (Exception e) {
+            WritableMap error = Arguments.createMap();
+            error.putString("error", e.getMessage());
+            promise.resolve(error);
         }
     }
 }

@@ -21,6 +21,7 @@ public class AgroAppPackage implements ReactPackage {
         modules.add(new AuthModule(reactContext));
         modules.add(new AnimalModule(reactContext));
         modules.add(new AnimalCameraModule(reactContext));
+        modules.add(new NotificationNativeModule(reactContext));
         return modules;
     }
 

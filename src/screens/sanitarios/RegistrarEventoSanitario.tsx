@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { useEventoSanitario } from '../../hooks/useEventoSanitario';
+import { programarNotificacionEvento } from '../../shared/services/notificacionSanitaria';
 import { COLORS, FONTS } from '../../shared/theme/identity';
 import { TipoEvento } from '../../types/Sanitario';
 
@@ -227,6 +228,24 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
         fechaEvento: form.fechaEvento,
         fechaProximoEvento: form.fechaProximoEvento,
       });
+
+      if (reminderEnabled && form.fechaProximoEvento) {
+        try {
+          await programarNotificacionEvento({
+            id: 0,
+            animalId: animalIdResolved,
+            tipoEvento: form.tipoEvento,
+            descripcion: form.descripcion.trim() || null,
+            fechaEvento: form.fechaEvento,
+            veterinario: form.veterinario.trim() || null,
+            dosis: form.dosis.trim() || null,
+            observaciones: form.observaciones.trim() || null,
+            fechaProximoEvento: form.fechaProximoEvento,
+          });
+        } catch {
+          // No bloqueamos el guardado si la notificacion no pudo programarse.
+        }
+      }
 
       Alert.alert('Guardado', 'El evento sanitario fue registrado correctamente.');
       setForm(prev => ({

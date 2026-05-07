@@ -3,6 +3,7 @@ package com.agroappreact.models;
 public class EventoSanitario {
     private int id;
     private int animalId;
+    private String arete;
     private String tipoEvento;
     private String descripcion;
     private String fechaEvento;
@@ -67,6 +68,14 @@ public class EventoSanitario {
 
     public void setAnimalId(int animalId) {
         this.animalId = animalId;
+    }
+
+    public String getArete() {
+        return arete;
+    }
+
+    public void setArete(String arete) {
+        this.arete = arete;
     }
 
     public String getTipoEvento() {

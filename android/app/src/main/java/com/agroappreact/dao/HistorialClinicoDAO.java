@@ -1,92 +1,74 @@
 package com.agroappreact.dao;
 
-import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+
 import com.agroappreact.database.DatabaseHelper;
-import com.agroappreact.models.HistorialClinico;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class HistorialClinicoDAO {
-    private DatabaseHelper dbHelper;
-    
+    private final DatabaseHelper dbHelper;
+
     public HistorialClinicoDAO(DatabaseHelper dbHelper) {
         this.dbHelper = dbHelper;
     }
-    
-    public long insertarHistorial(HistorialClinico historial) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        
-        values.put(DatabaseHelper.COL_HISTORIAL_ANIMAL_ID, historial.getAnimalId());
-        values.put(DatabaseHelper.COL_HISTORIAL_FECHA, historial.getFecha());
-        values.put(DatabaseHelper.COL_HISTORIAL_ENFERMEDAD, historial.getEnfermedad());
-        values.put(DatabaseHelper.COL_HISTORIAL_SINTOMAS, historial.getSintomas());
-        values.put(DatabaseHelper.COL_HISTORIAL_TRATAMIENTO, historial.getTratamiento());
-        values.put(DatabaseHelper.COL_HISTORIAL_ESTADO, historial.getEstado());
-        values.put(DatabaseHelper.COL_HISTORIAL_OBSERVACIONES, historial.getObservaciones());
-        
-        return db.insert(DatabaseHelper.TABLE_HISTORIAL_CLINICO, null, values);
-    }
-    
-    public int actualizarHistorial(HistorialClinico historial) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        
-        values.put(DatabaseHelper.COL_HISTORIAL_ANIMAL_ID, historial.getAnimalId());
-        values.put(DatabaseHelper.COL_HISTORIAL_FECHA, historial.getFecha());
-        values.put(DatabaseHelper.COL_HISTORIAL_ENFERMEDAD, historial.getEnfermedad());
-        values.put(DatabaseHelper.COL_HISTORIAL_SINTOMAS, historial.getSintomas());
-        values.put(DatabaseHelper.COL_HISTORIAL_TRATAMIENTO, historial.getTratamiento());
-        values.put(DatabaseHelper.COL_HISTORIAL_ESTADO, historial.getEstado());
-        values.put(DatabaseHelper.COL_HISTORIAL_OBSERVACIONES, historial.getObservaciones());
-        
-        return db.update(DatabaseHelper.TABLE_HISTORIAL_CLINICO, values,
-            DatabaseHelper.COL_HISTORIAL_ID + "=?",
-            new String[]{String.valueOf(historial.getId())});
-    }
-    
-    public int eliminarHistorial(int id) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        return db.delete(DatabaseHelper.TABLE_HISTORIAL_CLINICO,
-            DatabaseHelper.COL_HISTORIAL_ID + "=?",
-            new String[]{String.valueOf(id)});
-    }
-    
-    public List<HistorialClinico> obtenerHistorialPorAnimal(int animalId) {
-        List<HistorialClinico> historiales = new ArrayList<>();
+
+    public List<HistorialItem> obtenerHistorialCompleto(int animalId, int pagina, int porPagina) {
+        List<HistorialItem> resultado = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Cursor cursor = db.query(
-            DatabaseHelper.TABLE_HISTORIAL_CLINICO,
-            null,
-            DatabaseHelper.COL_HISTORIAL_ANIMAL_ID + "=?",
-            new String[]{String.valueOf(animalId)},
-            null, null,
-            DatabaseHelper.COL_HISTORIAL_FECHA + " DESC"
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                historiales.add(cursorToHistorial(cursor));
-            } while (cursor.moveToNext());
-            cursor.close();
+
+        int limit = porPagina;
+        int offset = pagina * porPagina;
+
+        String sql = "SELECT es.*, a." + DatabaseHelper.COL_ANIMAL_ARETE + " as arete FROM "
+            + DatabaseHelper.TABLE_EVENTOS_SANITARIOS + " es INNER JOIN " + DatabaseHelper.TABLE_ANIMALES
+            + " a ON es." + DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID + " = a." + DatabaseHelper.COL_ANIMAL_ID
+            + " WHERE es." + DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID + " = ?"
+            + " ORDER BY es." + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC LIMIT ? OFFSET ?";
+
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(sql, new String[]{ String.valueOf(animalId), String.valueOf(limit), String.valueOf(offset) });
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    HistorialItem h = new HistorialItem();
+                    h.setId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ID)));
+                    h.setAnimalId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID)));
+                    h.setTipoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_TIPO_EVENTO)));
+                    h.setDescripcion(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DESCRIPCION)));
+                    h.setFechaEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO)));
+                    h.setVeterinario(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_VETERINARIO)));
+                    h.setDosis(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS)));
+                    h.setObservaciones(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES)));
+                    // arete column aliased
+                    int areteIndex = cursor.getColumnIndex("arete");
+                    if (areteIndex != -1) {
+                        h.setArete(cursor.getString(areteIndex));
+                    }
+                    resultado.add(h);
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) cursor.close();
         }
-        
-        return historiales;
+
+        return resultado;
     }
-    
-    private HistorialClinico cursorToHistorial(Cursor cursor) {
-        return new HistorialClinico(
-            cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_ID)),
-            cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_ANIMAL_ID)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_FECHA)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_ENFERMEDAD)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_SINTOMAS)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_TRATAMIENTO)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_ESTADO)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_HISTORIAL_OBSERVACIONES))
-        );
+
+    public int contarEventos(int animalId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = null;
+        int count = 0;
+        try {
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_EVENTOS_SANITARIOS + " WHERE " + DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID + " = ?", new String[]{ String.valueOf(animalId) });
+            if (cursor != null && cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return count;
     }
 }

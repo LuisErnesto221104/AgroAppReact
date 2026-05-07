@@ -9,6 +9,7 @@ export enum TipoEvento {
 export interface EventoSanitarioModel {
   id: number;
   animalId: number;
+  arete?: string;
   tipoEvento: TipoEvento;
   descripcion: string | null;
   fechaEvento: string;

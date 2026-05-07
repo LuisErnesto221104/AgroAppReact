@@ -1,23 +1,36 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 
 import { EventoSanitarioResumen } from '../../types/Animal';
 
 type EventoSanitarioItemProps = {
   evento: EventoSanitarioResumen;
+  primaryLabel?: string;
+  onPrimaryAction?: (evento: EventoSanitarioResumen) => void;
+  secondaryLabel?: string;
+  onSecondaryAction?: (evento: EventoSanitarioResumen) => void;
+  showCompleted?: boolean;
+  onOpenDetail?: (evento: EventoSanitarioResumen) => void;
 };
 
-export function EventoSanitarioItem({ evento }: EventoSanitarioItemProps) {
+export function EventoSanitarioItem({
+  evento,
+  primaryLabel,
+  onPrimaryAction,
+  secondaryLabel,
+  onSecondaryAction,
+  showCompleted,
+  onOpenDetail,
+}: EventoSanitarioItemProps) {
   const titulo = evento.enfermedad?.trim() || 'Evento sanitario';
-  const fecha = evento.fecha || 'Sin fecha';
+  const fecha = (evento.fechaEvento || evento.fecha) || 'Sin fecha';
   const detalle =
-    evento.tratamiento?.trim() ||
-    evento.sintomas?.trim() ||
-    evento.observaciones?.trim() ||
+    (evento.observaciones && evento.observaciones.trim()) ||
+    (evento.descripcion && evento.descripcion.trim()) ||
     'Sin detalle';
 
   return (
-    <View style={styles.card}>
+    <Pressable onPress={() => onOpenDetail && onOpenDetail(evento)} style={styles.card}>
       <View style={styles.leftAccent} />
       <View style={styles.iconWrap}>
         <Text style={styles.iconText}>🩺</Text>
@@ -27,37 +40,55 @@ export function EventoSanitarioItem({ evento }: EventoSanitarioItemProps) {
         <Text style={styles.detail}>{detalle}</Text>
         <Text style={styles.fecha}>Aplicado: {fecha}</Text>
       </View>
-    </View>
+      <View style={styles.actionsWrap}>
+        {showCompleted ? (
+          <View style={styles.completedBadge}><Text style={{ color: '#fff' }}>✓</Text></View>
+        ) : (
+          <>
+            {secondaryLabel && onSecondaryAction ? (
+              <Pressable style={styles.secondaryBtn} onPress={() => onSecondaryAction(evento)}>
+                <Text style={styles.secondaryBtnText}>{secondaryLabel}</Text>
+              </Pressable>
+            ) : null}
+            {primaryLabel && onPrimaryAction ? (
+              <Pressable style={styles.primaryBtn} onPress={() => onPrimaryAction(evento)}>
+                <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: '#f0f0f0',
-    padding: 12,
-    marginBottom: 8,
+    padding: 14,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
   },
   leftAccent: {
-    width: 4,
+    width: 5,
     alignSelf: 'stretch',
     borderRadius: 2,
     backgroundColor: '#3aa65f',
-    marginRight: 10,
+    marginRight: 12,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#e3ebdf',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   iconText: {
-    fontSize: 16,
+    fontSize: 22,
   },
   contentWrap: {
     flex: 1,
@@ -65,18 +96,41 @@ const styles = StyleSheet.create({
   title: {
     color: '#1f1f1f',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 16,
   },
   detail: {
-    marginTop: 2,
+    marginTop: 3,
     color: '#5a5a5a',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  fecha: {
+    marginTop: 3,
+    color: '#8a8a8a',
     fontWeight: '600',
     fontSize: 12,
   },
-  fecha: {
-    marginTop: 2,
-    color: '#8a8a8a',
-    fontWeight: '600',
-    fontSize: 11,
+  actionsWrap: {
+    marginLeft: 10,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
+  primaryBtn: {
+    backgroundColor: '#0a6b33',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 3,
+  },
+  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  secondaryBtn: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  secondaryBtnText: { color: '#333', fontWeight: '700', fontSize: 10 },
+  completedBadge: { backgroundColor: '#39a861', padding: 10, borderRadius: 14 },
 });

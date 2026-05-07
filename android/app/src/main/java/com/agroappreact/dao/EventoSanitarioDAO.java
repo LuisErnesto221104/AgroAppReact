@@ -140,22 +140,17 @@ public class EventoSanitarioDAO {
 
         Cursor cursor = null;
         try {
-            String selection = DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " LIKE ? OR " + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO + " LIKE ?";
-            String[] selectionArgs = new String[]{ like, like };
+            String sql = "SELECT e.*, a." + DatabaseHelper.COL_ANIMAL_ARETE + " FROM " +
+                    DatabaseHelper.TABLE_EVENTOS_SANITARIOS + " e " +
+                    "LEFT JOIN " + DatabaseHelper.TABLE_ANIMALES + " a ON e." + DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID + " = a." + DatabaseHelper.COL_ANIMAL_ID + " " +
+                    "WHERE e." + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " LIKE ? OR e." + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO + " LIKE ? " +
+                    "ORDER BY e." + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC";
 
-            cursor = db.query(
-                DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
-                null,
-                selection,
-                selectionArgs,
-                null,
-                null,
-                DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC"
-            );
+            cursor = db.rawQuery(sql, new String[]{like, like});
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    eventos.add(cursorToEvento(cursor));
+                    eventos.add(cursorToEventoWithArete(cursor));
                 } while (cursor.moveToNext());
             }
         } finally {
@@ -203,6 +198,29 @@ public class EventoSanitarioDAO {
         evento.setDosis(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS)));
         evento.setObservaciones(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES)));
         evento.setFechaProximoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO)));
+        return evento;
+    }
+
+    private EventoSanitario cursorToEventoWithArete(Cursor cursor) {
+        EventoSanitario evento = new EventoSanitario();
+        evento.setId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ID)));
+        evento.setAnimalId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID)));
+        evento.setTipoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_TIPO_EVENTO)));
+        evento.setDescripcion(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DESCRIPCION)));
+        evento.setFechaEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO)));
+        evento.setVeterinario(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_VETERINARIO)));
+        evento.setDosis(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS)));
+        evento.setObservaciones(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES)));
+        evento.setFechaProximoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO)));
+        
+        // Agregar arete desde el JOIN con tabla Animals
+        try {
+            String arete = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ANIMAL_ARETE));
+            evento.setArete(arete);
+        } catch (IllegalArgumentException e) {
+            evento.setArete(null);
+        }
+        
         return evento;
     }
 }

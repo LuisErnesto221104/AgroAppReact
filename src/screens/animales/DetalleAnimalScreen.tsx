@@ -51,9 +51,10 @@ type DetalleAnimalScreenProps = {
   onBack: () => void;
   onEdit: (animal: AnimalModel) => void;
   onDeleted: () => void;
+  onOpenHistorial?: (animalId: number) => void;
 };
 
-export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, onDeleted }: DetalleAnimalScreenProps) {
+export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, onDeleted, onOpenHistorial }: DetalleAnimalScreenProps) {
   const [currentAnimal, setCurrentAnimal] = useState<AnimalModel | null>(null);
   const [historial, setHistorial] = useState<HistorialResumen>({
     historial_peso: [],
@@ -257,7 +258,7 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
           eventosRecientes.map(evento => <EventoSanitarioItem key={String(evento.id)} evento={evento} />)
         )}
 
-        <Pressable onPress={() => Alert.alert('Historial', 'Vista completa de historial clínico: próximamente.')}>
+        <Pressable onPress={() => onOpenHistorial ? onOpenHistorial(animalId) : Alert.alert('Historial', 'Vista completa de historial clínico: próximamente.') }>
           <Text style={styles.historialLink}>Ver historial clínico completo →</Text>
         </Pressable>
       </ScrollView>

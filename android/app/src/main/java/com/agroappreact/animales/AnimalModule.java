@@ -327,24 +327,61 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                 }
 
                 String targetEstado = normalizeEstado(readRequiredString(payload, "estado"));
-                boolean validTransition =
-                        ("ACTIVO".equals(currentEstado) && "FALLECIDO".equals(targetEstado)) ||
-                        ("FALLECIDO".equals(currentEstado) && "ACTIVO".equals(targetEstado));
-                if (!validTransition) {
-                    promise.reject(ERR_ESTADO_TRANSITION, "Transicion de estado no permitida.");
-                    return;
+                
+                // Sprint 3 — RF002: Validar VENDIDO
+                Double precioVenta = null;
+                String fechaVenta = null;
+                if ("VENDIDO".equals(targetEstado)) {
+                    if (!payload.hasKey("precioVenta") || payload.isNull("precioVenta") || payload.getDouble("precioVenta") <= 0) {
+                        promise.reject("ERR_PRECIO_INVALIDO", "El precio de venta debe ser mayor a $0");
+                        return;
+                    }
+                    precioVenta = payload.getDouble("precioVenta");
+                    
+                    if (!payload.hasKey("fechaVenta") || payload.isNull("fechaVenta")) {
+                        promise.reject("ERR_FECHA_VENTA", "La fecha de venta es obligatoria");
+                        return;
+                    }
+                    fechaVenta = payload.getString("fechaVenta");
+                    if (fechaVenta == null || fechaVenta.trim().isEmpty()) {
+                        promise.reject("ERR_FECHA_VENTA", "La fecha de venta es obligatoria");
+                        return;
+                    }
+                    // Si llegamos aquí, VENDIDO es válido
+                } else {
+                    // Para otros estados, usar la lógica original
+                    boolean validTransition =
+                            ("ACTIVO".equals(currentEstado) && "FALLECIDO".equals(targetEstado)) ||
+                            ("FALLECIDO".equals(currentEstado) && "ACTIVO".equals(targetEstado));
+                    if (!validTransition) {
+                        promise.reject(ERR_ESTADO_TRANSITION, "Transicion de estado no permitida.");
+                        return;
+                    }
                 }
 
                 String fechaBaja = "ACTIVO".equals(targetEstado) ? null : readRequiredString(payload, "fecha_baja");
                 String motivoBaja = "ACTIVO".equals(targetEstado) ? null : readRequiredString(payload, "motivo_baja");
 
-                int changedRows = animalDAO.changeEstado(
-                        id,
-                        targetEstado,
-                        fechaBaja,
-                        motivoBaja,
-                        String.valueOf(System.currentTimeMillis())
-                );
+                int changedRows;
+                if ("VENDIDO".equals(targetEstado) && precioVenta != null && fechaVenta != null) {
+                    changedRows = animalDAO.changeEstado(
+                            id,
+                            targetEstado,
+                            fechaBaja,
+                            motivoBaja,
+                            String.valueOf(System.currentTimeMillis()),
+                            precioVenta,
+                            fechaVenta
+                    );
+                } else {
+                    changedRows = animalDAO.changeEstado(
+                            id,
+                            targetEstado,
+                            fechaBaja,
+                            motivoBaja,
+                            String.valueOf(System.currentTimeMillis())
+                    );
+                }
 
                 if (changedRows <= 0) {
                     promise.reject("ANIMAL_UPDATE_ERROR", "No se pudo cambiar el estado del animal.");

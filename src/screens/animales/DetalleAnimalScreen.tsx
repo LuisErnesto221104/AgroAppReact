@@ -14,6 +14,8 @@ import {
 
 import { EventoSanitarioItem } from '../../components/animales/EventoSanitarioItem';
 import { EstadoBadge } from '../../components/animales/EstadoBadge';
+import { ResumenInversionCard } from '../../components/animales/ResumenInversionCard';
+import { VentaAnimalModal } from '../../components/animales/VentaAnimalModal';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, HistorialResumen } from '../../types/Animal';
 import { RegistrarEventoSanitario } from '../sanitarios/RegistrarEventoSanitario';
@@ -66,6 +68,7 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
   const [showRegistrarEvento, setShowRegistrarEvento] = useState(false);
+  const [showVentaModal, setShowVentaModal] = useState(false);
 
 
   const loadDetalle = useCallback(async () => {
@@ -261,6 +264,18 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
         <Pressable onPress={() => onOpenHistorial ? onOpenHistorial(animalId) : Alert.alert('Historial', 'Vista completa de historial clínico: próximamente.') }>
           <Text style={styles.historialLink}>Ver historial clínico completo →</Text>
         </Pressable>
+
+        {currentAnimal && (
+          <ResumenInversionCard
+            animalId={currentAnimal.id}
+            animalEstado={currentAnimal.estado as 'ACTIVO' | 'FALLECIDO' | 'VENDIDO'}
+            onRegistrarVenta={() => {
+              if (currentAnimal.estado === 'ACTIVO') {
+                setShowVentaModal(true);
+              }
+            }}
+          />
+        )}
       </ScrollView>
 
       <View style={styles.actionBar}>
@@ -326,6 +341,19 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
           </View>
         </View>
       </Modal>
+
+      {currentAnimal && (
+        <VentaAnimalModal
+          visible={showVentaModal}
+          animalId={currentAnimal.id}
+          arete={currentAnimal.arete}
+          onVentaExitosa={() => {
+            setShowVentaModal(false);
+            void loadDetalle();
+          }}
+          onCancelar={() => setShowVentaModal(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -18,6 +18,8 @@ export interface AnimalModel {
   estado: AnimalEstado;
   fecha_baja: string | null;
   motivo_baja: string | null;
+  precio_venta: number | null; // Sprint 3 — RF002
+  fecha_venta: string | null; // Sprint 3 — RF002
 }
 
 export type AnimalEstado = 'ACTIVO' | 'VENDIDO' | 'FALLECIDO';
@@ -62,6 +64,8 @@ export interface ChangeEstadoPayload {
   estado: AnimalEstado;
   fecha_baja?: string;
   motivo_baja?: string;
+  precioVenta?: number; // Sprint 3 — RF002
+  fechaVenta?: string; // Sprint 3 — RF002
 }
 
 export interface ChangeEstadoResult {
@@ -87,4 +91,19 @@ export interface EventoSanitarioResumen {
 export interface HistorialResumen {
   historial_peso: PesoHistorialPoint[];
   eventos_recientes: EventoSanitarioResumen[];
+}
+
+// Sprint 3 — RF002: Registro de Venta de Animal
+export interface VentaAnimalPayload {
+  id: number;
+  precioVenta: number;
+  fechaVenta: string;
+  comprador?: string;
+}
+
+export interface VentaAnimalResult {
+  ok: boolean;
+  animalId: number;
+  precioVenta: number;
+  margenEstimado: number | null;
 }

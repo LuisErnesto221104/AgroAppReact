@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
   Switch,
+  NativeModules,
 } from 'react-native';
 
 import { useEventoSanitario } from '../../hooks/useEventoSanitario';
@@ -43,23 +44,31 @@ type RegistrarEventoSanitarioProps = {
 type FormState = {
   animalIdInput: string;
   tipoEvento: TipoEvento;
+  subtipo: string;
   descripcion: string;
   veterinario: string;
   dosis: string;
   observaciones: string;
   fechaEvento: string;
   fechaProximoEvento: string;
+  fechaProximoEventoSugerida?: string;
 };
 
 const INITIAL_FORM: FormState = {
   animalIdInput: '',
   tipoEvento: TipoEvento.VACUNA,
+  subtipo: '',
   descripcion: '',
   veterinario: '',
   dosis: '',
   observaciones: '',
   fechaEvento: '',
   fechaProximoEvento: '',
+};
+
+const SUBTIPOS_POR_TIPO = {
+  [TipoEvento.VACUNA]: ['AFTOSA', 'BRUCELOSIS'],
+  [TipoEvento.DESPARASITACION]: ['INTERNA', 'EXTERNA'],
 };
 
 const formatDate = (date: Date) => {
@@ -147,6 +156,32 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
       setListVisible(false);
     });
   }, [animalIdResolved, listar]);
+
+  // Calcular próxima fecha según NOM-041 cuando cambien tipoEvento, subtipo o fechaEvento
+  useEffect(() => {
+    const calcularFecha = async () => {
+      if (
+        form.tipoEvento &&
+        form.subtipo &&
+        form.fechaEvento &&
+        (form.tipoEvento === TipoEvento.VACUNA || form.tipoEvento === TipoEvento.DESPARASITACION)
+      ) {
+        try {
+          const proximaFecha = await NativeModules.AgroBridgeModule.calcularProximaFechaNOM(
+            form.tipoEvento,
+            form.subtipo,
+            form.fechaEvento
+          );
+          if (proximaFecha) {
+            setForm(prev => ({ ...prev, fechaProximoEventoSugerida: proximaFecha }));
+          }
+        } catch (e) {
+          // Si falla el cálculo, dejamos que el usuario ingrese manualmente
+        }
+      }
+    };
+    calcularFecha();
+  }, [form.tipoEvento, form.subtipo, form.fechaEvento]);
 
   const setField = (key: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -311,6 +346,27 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
               );
             })}
           </View>
+
+          {/* Mostrar chips de subtipo si es VACUNA o DESPARASITACION */}
+          {(form.tipoEvento === TipoEvento.VACUNA || form.tipoEvento === TipoEvento.DESPARASITACION) && (
+            <View>
+              <Text style={styles.label}>Subtipo</Text>
+              <View style={styles.chipsRow}>
+                {SUBTIPOS_POR_TIPO[form.tipoEvento]?.map(sub => {
+                  const selected = form.subtipo === sub;
+                  return (
+                    <Pressable
+                      key={sub}
+                      onPress={() => setField('subtipo', sub)}
+                      style={[styles.chip, selected && styles.chipSelected]}
+                    >
+                      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{sub}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -381,6 +437,15 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
           {fieldErrors.fechaEvento ? <Text style={styles.errorText}>{fieldErrors.fechaEvento}</Text> : null}
 
           <Text style={styles.label}>Fecha proxima</Text>
+          {form.fechaProximoEventoSugerida && !form.fechaProximoEvento && (
+            <Pressable
+              style={styles.suggestedDateButton}
+              onPress={() => setField('fechaProximoEvento', form.fechaProximoEventoSugerida!)}
+            >
+              <Text style={styles.suggestedDateLabel}>Sugerido NOM-041</Text>
+              <Text style={styles.suggestedDateValue}>{form.fechaProximoEventoSugerida}</Text>
+            </Pressable>
+          )}
           <Pressable
             style={[
               styles.dateField,
@@ -799,5 +864,24 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingVertical: 16,
     borderRadius: 999,
+  },
+  suggestedDateButton: {
+    backgroundColor: '#f0f9f0',
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#c7e9c7',
+  },
+  suggestedDateLabel: {
+    color: '#555555',
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+  },
+  suggestedDateValue: {
+    color: COLORS.primary,
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    marginTop: 6,
   },
 });

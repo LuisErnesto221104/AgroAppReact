@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { AnimalFotoCaptura } from '../../components/animales/AnimalFotoCaptura';
+import { VentaAnimalModal } from '../../components/animales/VentaAnimalModal';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, UpdateAnimalPayload } from '../../types/Animal';
 
@@ -63,7 +64,7 @@ type EditFormState = {
   fecha: string;
   peso: string;
   fotoPath: string | null;
-  estado: 'ACTIVO' | 'FALLECIDO';
+  estado: 'ACTIVO' | 'VENDIDO' | 'FALLECIDO';
   fechaBaja: string;
   motivoBaja: string;
 };
@@ -94,13 +95,14 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     fecha: animal.fecha,
     peso: animal.peso == null ? '' : String(Math.trunc(animal.peso)),
     fotoPath: initialPhotoUri,
-    estado: animal.estado === 'FALLECIDO' ? 'FALLECIDO' : 'ACTIVO',
+    estado: animal.estado === 'FALLECIDO' ? 'FALLECIDO' : animal.estado === 'VENDIDO' ? 'VENDIDO' : 'ACTIVO',
     fechaBaja: animal.fecha_baja ?? '',
     motivoBaja: animal.motivo_baja ?? '',
   });
   const [loading, setLoading] = useState(false);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [datePickerBajaVisible, setDatePickerBajaVisible] = useState(false);
+  const [ventaModalVisible, setVentaModalVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     return form.fecha ? new Date(`${form.fecha}T00:00:00`) : new Date();
   });
@@ -314,9 +316,22 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
             </Text>
           </Pressable>
 
-          <View style={[styles.estadoSelectorChip, styles.estadoSelectorChipDisabled]}>
-            <Text style={styles.estadoSelectorTextDisabled}>🟠 Vendido</Text>
-          </View>
+          <Pressable
+            style={[
+              styles.estadoSelectorChip,
+              form.estado === 'VENDIDO' && styles.estadoSelectorChipVendido,
+            ]}
+            onPress={() => setVentaModalVisible(true)}
+          >
+            <Text
+              style={[
+                styles.estadoSelectorText,
+                form.estado === 'VENDIDO' && styles.estadoSelectorTextVendido,
+              ]}
+            >
+              🟠 Vendido {form.estado === 'VENDIDO' && '✓'}
+            </Text>
+          </Pressable>
 
           <Pressable
             style={[styles.estadoSelectorChip, form.estado === 'FALLECIDO' && styles.estadoSelectorChipFallecido]}
@@ -332,6 +347,24 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
             </Text>
           </Pressable>
         </View>
+
+        {animal.estado === 'VENDIDO' && (
+          <View style={styles.ventaDetailsCard}>
+            <Text style={styles.ventaDetailsTitle}>Información de venta</Text>
+            {animal.fecha_venta && (
+              <View style={styles.ventaDetailRow}>
+                <Text style={styles.ventaDetailLabel}>Fecha:</Text>
+                <Text style={styles.ventaDetailValue}>{animal.fecha_venta}</Text>
+              </View>
+            )}
+            {animal.precio_venta && (
+              <View style={styles.ventaDetailRow}>
+                <Text style={styles.ventaDetailLabel}>Precio:</Text>
+                <Text style={styles.ventaDetailValue}>${animal.precio_venta.toFixed(2)}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {animal.estado !== 'VENDIDO' ? (
           <Pressable
@@ -545,6 +578,20 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           </View>
         </View>
       </Modal>
+
+      <VentaAnimalModal
+        visible={ventaModalVisible}
+        animalId={animal.id}
+        arete={animal.arete}
+        precioVentaExistente={animal.precio_venta}
+        fechaVentaExistente={animal.fecha_venta}
+        onVentaExitosa={() => {
+          setField('estado', 'VENDIDO');
+          setVentaModalVisible(false);
+          onSaved();
+        }}
+        onCancelar={() => setVentaModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -640,6 +687,11 @@ const styles = StyleSheet.create({
     borderColor: '#9145aa',
     backgroundColor: '#f6eefa',
   },
+  estadoSelectorChipVendido: {
+    borderColor: '#ff6f00',
+    backgroundColor: '#ffe0b2',
+    borderWidth: 2,
+  },
   estadoSelectorText: {
     color: '#2a2a2a',
     fontWeight: '700',
@@ -655,6 +707,40 @@ const styles = StyleSheet.create({
   },
   estadoSelectorTextFallecido: {
     color: '#7a3a8d',
+  },
+  estadoSelectorTextVendido: {
+    color: '#e65100',
+  },
+  ventaDetailsCard: {
+    marginTop: 16,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#f0f9f0',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0a6b33',
+  },
+  ventaDetailsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0a6b33',
+    marginBottom: 8,
+  },
+  ventaDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  ventaDetailLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
+  },
+  ventaDetailValue: {
+    fontSize: 12,
+    color: '#0a6b33',
+    fontWeight: '700',
   },
   fallecidoToggle: {
     marginTop: 10,

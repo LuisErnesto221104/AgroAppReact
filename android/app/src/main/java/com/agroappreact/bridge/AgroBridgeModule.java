@@ -13,8 +13,10 @@ import com.facebook.react.bridge.WritableArray;
 import com.agroappreact.dao.EventoSanitarioDAO;
 import com.agroappreact.dao.HistorialClinicoDAO;
 import com.agroappreact.dao.HistorialItem;
+import com.agroappreact.dao.GastoDAO;
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.EventoSanitario;
+import com.agroappreact.models.Gasto;
 import com.agroappreact.services.SanitarioCicloNOM041;
 import com.agroappreact.services.InversionCalculadora;
 
@@ -40,12 +42,14 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     private final DatabaseHelper databaseHelper;
     private final EventoSanitarioDAO eventoSanitarioDAO;
     private final HistorialClinicoDAO historialClinicoDAO;
+    private final GastoDAO gastoDAO;
 
     public AgroBridgeModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.databaseHelper = DatabaseHelper.getInstance(reactContext);
         this.eventoSanitarioDAO = new EventoSanitarioDAO(databaseHelper);
         this.historialClinicoDAO = new HistorialClinicoDAO(databaseHelper);
+        this.gastoDAO = new GastoDAO(databaseHelper);
     }
 
     @Override
@@ -256,6 +260,146 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
         format.setLenient(false);
         format.setTimeZone(TimeZone.getTimeZone("UTC"));
         return truncarFecha(format.parse(valor.trim()));
+    }
+
+    // ===== MÉTODOS DE GASTOS (Sprint 4) =====
+
+    @ReactMethod
+    public void registrarGasto(ReadableMap datos, Promise promise) {
+        try {
+            Integer animalId = datos.hasKey("animalId") && !datos.isNull("animalId") 
+                ? datos.getInt("animalId") 
+                : null;
+            String categoria = datos.getString("categoria");
+            String descripcion = datos.getString("descripcion");
+            double monto = datos.getDouble("monto");
+            String fecha = datos.getString("fecha");
+            String notas = datos.hasKey("notas") ? datos.getString("notas") : null;
+
+            if (categoria == null || descripcion == null || fecha == null) {
+                promise.reject("ERROR", "Faltan campos obligatorios");
+                return;
+            }
+
+            if (monto < 0) {
+                promise.reject("ERROR", "El monto no puede ser negativo");
+                return;
+            }
+
+            Gasto gasto = new Gasto(animalId, categoria, descripcion, monto, fecha, notas);
+            long id = gastoDAO.insertarGasto(gasto);
+
+            if (id > 0) {
+                promise.resolve(id);
+            } else {
+                promise.reject("ERROR", "No se pudo insertar el gasto");
+            }
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void getGastosPorAnimal(int animalId, Promise promise) {
+        try {
+            List<Gasto> gastos = gastoDAO.obtenerGastosPorAnimal(animalId);
+            WritableArray array = Arguments.createArray();
+
+            for (Gasto gasto : gastos) {
+                WritableMap map = Arguments.createMap();
+                map.putInt("id", gasto.getId());
+                map.putInt("animalId", gasto.getAnimalId() != null ? gasto.getAnimalId() : -1);
+                map.putString("categoria", gasto.getCategoria());
+                map.putString("descripcion", gasto.getDescripcion());
+                map.putDouble("monto", gasto.getMonto());
+                map.putString("fecha", gasto.getFecha());
+                map.putString("notas", gasto.getNotas());
+                array.pushMap(map);
+            }
+
+            promise.resolve(array);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void obtenerTodosGastos(Promise promise) {
+        try {
+            List<Gasto> gastos = gastoDAO.obtenerTodosGastos();
+            WritableArray array = Arguments.createArray();
+
+            for (Gasto gasto : gastos) {
+                WritableMap map = Arguments.createMap();
+                map.putInt("id", gasto.getId());
+                if (gasto.getAnimalId() != null) {
+                    map.putInt("animalId", gasto.getAnimalId());
+                } else {
+                    map.putNull("animalId");
+                }
+                map.putString("categoria", gasto.getCategoria());
+                map.putString("descripcion", gasto.getDescripcion());
+                map.putDouble("monto", gasto.getMonto());
+                map.putString("fecha", gasto.getFecha());
+                map.putString("notas", gasto.getNotas());
+                array.pushMap(map);
+            }
+
+            promise.resolve(array);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void updateGasto(ReadableMap datos, Promise promise) {
+        try {
+            int id = datos.getInt("id");
+            Integer animalId = datos.hasKey("animalId") && !datos.isNull("animalId") 
+                ? datos.getInt("animalId") 
+                : null;
+            String categoria = datos.getString("categoria");
+            String descripcion = datos.getString("descripcion");
+            double monto = datos.getDouble("monto");
+            String fecha = datos.getString("fecha");
+            String notas = datos.hasKey("notas") ? datos.getString("notas") : null;
+
+            if (monto < 0) {
+                promise.reject("ERROR", "El monto no puede ser negativo");
+                return;
+            }
+
+            Gasto gasto = new Gasto(id, animalId, categoria, descripcion, monto, fecha, notas);
+            int filas = gastoDAO.actualizarGasto(gasto);
+
+            if (filas > 0) {
+                promise.resolve(true);
+            } else {
+                promise.reject("ERROR", "No se encontró el gasto para actualizar");
+            }
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void deleteGasto(int id, Promise promise) {
+        try {
+            boolean eliminado = gastoDAO.eliminarGasto(id);
+            promise.resolve(eliminado);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void sumarGastosPorAnimal(int animalId, Promise promise) {
+        try {
+            double total = gastoDAO.sumarGastosPorAnimal(animalId);
+            promise.resolve(total);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
     }
 
     private Date truncarFecha(Date fecha) {

@@ -16,7 +16,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 10; // Sprint 3 — RF002: columnas de venta
+    private static final int DATABASE_VERSION = 11; // Sprint 4 — RF003: sistema de costos
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -99,15 +99,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COL_HISTORIAL_ESTADO = "estado";
     public static final String COL_HISTORIAL_OBSERVACIONES = "observaciones";
     
-    // Tabla Gastos
+    // Tabla Gastos (Sprint 4: mejorada)
     public static final String TABLE_GASTOS = "gastos";
     public static final String COL_GASTO_ID = "id";
     public static final String COL_GASTO_ANIMAL_ID = "animal_id";
+    public static final String COL_GASTO_CATEGORIA = "categoria";
+    public static final String COL_GASTO_DESCRIPCION = "descripcion";
+    public static final String COL_GASTO_MONTO = "monto";
+    public static final String COL_GASTO_FECHA = "fecha";
+    public static final String COL_GASTO_NOTAS = "notas";
+    // Deprecated (v10)
     public static final String COL_GASTO_RAZA = "raza";
     public static final String COL_GASTO_TIPO = "tipo";
     public static final String COL_GASTO_CONCEPTO = "concepto";
-    public static final String COL_GASTO_MONTO = "monto";
-    public static final String COL_GASTO_FECHA = "fecha";
     public static final String COL_GASTO_OBSERVACIONES = "observaciones";
     
     // Tabla Alimentación
@@ -311,6 +315,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Sprint 3 — RF002: columnas de venta
             db.execSQL("ALTER TABLE " + TABLE_ANIMALES + " ADD COLUMN " + COL_ANIMAL_FECHA_VENTA + " TEXT DEFAULT NULL;");
         }
+        if (oldVersion < 11) {
+            // Sprint 4 — RF003: mejorar sistema de costos
+            migracionGastosV11(db);
+        }
     }
     
     @Override
@@ -449,5 +457,44 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public static String areteIndexDDL() {
         return "CREATE UNIQUE INDEX IF NOT EXISTS idx_arete ON " + TABLE_ANIMALES + " (" + COL_ANIMAL_ARETE + ")";
+    }
+
+    /**
+     * Migración v11: Reestructurar tabla de gastos con nuevos campos
+     */
+    private void migracionGastosV11(SQLiteDatabase db) {
+        try {
+            // 1. Crear nueva tabla con estructura mejorada
+            db.execSQL("CREATE TABLE " + TABLE_GASTOS + "_new (" +
+                    COL_GASTO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COL_GASTO_ANIMAL_ID + " INTEGER, " +
+                    COL_GASTO_CATEGORIA + " TEXT NOT NULL CHECK(" + COL_GASTO_CATEGORIA + " IN ('ALIMENTACION','MEDICAMENTOS','TRASLADO','VETERINARIO','OTRO')), " +
+                    COL_GASTO_DESCRIPCION + " TEXT NOT NULL, " +
+                    COL_GASTO_MONTO + " REAL NOT NULL CHECK(" + COL_GASTO_MONTO + " >= 0), " +
+                    COL_GASTO_FECHA + " TEXT NOT NULL, " +
+                    COL_GASTO_NOTAS + " TEXT, " +
+                    "FOREIGN KEY(" + COL_GASTO_ANIMAL_ID + ") REFERENCES " +
+                    TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE SET NULL)");
+            
+            // 2. Migrar datos existentes (tipo -> categoria, concepto -> descripcion, observaciones -> notas)
+            db.execSQL("INSERT INTO " + TABLE_GASTOS + "_new (" +
+                    COL_GASTO_ID + ", " + COL_GASTO_ANIMAL_ID + ", " + COL_GASTO_CATEGORIA + ", " +
+                    COL_GASTO_DESCRIPCION + ", " + COL_GASTO_MONTO + ", " + COL_GASTO_FECHA + ", " + COL_GASTO_NOTAS + ") " +
+                    "SELECT " + COL_GASTO_ID + ", " + COL_GASTO_ANIMAL_ID + ", " +
+                    "COALESCE(" + COL_GASTO_TIPO + ", 'OTRO') AS categoria, " +
+                    "COALESCE(" + COL_GASTO_CONCEPTO + ", '') AS descripcion, " +
+                    COL_GASTO_MONTO + ", " + COL_GASTO_FECHA + ", " + COL_GASTO_OBSERVACIONES + " " +
+                    "FROM " + TABLE_GASTOS);
+            
+            // 3. Eliminar tabla vieja
+            db.execSQL("DROP TABLE " + TABLE_GASTOS);
+            
+            // 4. Renombrar nueva tabla
+            db.execSQL("ALTER TABLE " + TABLE_GASTOS + "_new RENAME TO " + TABLE_GASTOS);
+            
+        } catch (Exception e) {
+            // Si la migración falla (tabla ya migrada), ignorar
+            e.printStackTrace();
+        }
     }
 }

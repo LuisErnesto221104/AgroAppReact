@@ -3,7 +3,15 @@
     "allow": [
       "Bash(adb devices *)",
       "Bash(/home/ernesto/Android/Sdk/platform-tools/adb devices *)",
-      "Bash(npx --version)"
+      "Bash(npx --version)",
+      "Bash(npx react-native *)",
+      "Bash(.\\\\gradlew assembleDebug --offline)",
+      "PowerShell(adb install -r \"c:\\\\Users\\\\ernes\\\\AndroidStudioProjects\\\\AgroAppReact V2\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\" 2>&1)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; if \\(Test-Path $adb\\) { & $adb install -r \"c:\\\\Users\\\\ernes\\\\AndroidStudioProjects\\\\AgroAppReact V2\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\" 2>&1 } else { \"No encontrado en: $adb\" })",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb install -r \"c:\\\\Users\\\\ernes\\\\AndroidStudioProjects\\\\AgroAppReact V2\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\" 2>&1)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb kill-server 2>&1; Start-Sleep -Seconds 2; & $adb start-server 2>&1; Start-Sleep -Seconds 2; & $adb devices 2>&1)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb devices 2>&1)",
+      "PowerShell($adb = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $adb kill-server 2>&1; Start-Sleep -Seconds 3; & $adb start-server 2>&1; Start-Sleep -Seconds 3; & $adb devices 2>&1)"
     ]
   }
 }

@@ -5,6 +5,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 
+import com.agroappreact.database.DatabaseHelper;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -283,6 +285,37 @@ public class AnimalDAO {
             values.put(DatabaseHelper.COL_FECHA_BAJA, fechaBaja);
             values.put(DatabaseHelper.COL_MOTIVO_BAJA, motivoBaja);
             values.put(DatabaseHelper.COL_UPDATED_AT, updatedAt);
+
+            int rows = db.update(
+                    DatabaseHelper.TABLE_ANIMALES,
+                    values,
+                    DatabaseHelper.COL_ID + "=?",
+                    new String[]{String.valueOf(id)}
+            );
+            db.setTransactionSuccessful();
+            return rows;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    // Sprint 3 — RF002: Sobrecarga para manejar VENDIDO con precio y fecha de venta
+    public int changeEstado(long id, String estado, String fechaBaja, String motivoBaja, String updatedAt, Double precioVenta, String fechaVenta) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ensureAnimalesSchema(db);
+
+            ContentValues values = new ContentValues();
+            values.put(DatabaseHelper.COL_ESTADO, estado);
+            values.put(DatabaseHelper.COL_FECHA_BAJA, fechaBaja);
+            values.put(DatabaseHelper.COL_MOTIVO_BAJA, motivoBaja);
+            values.put(DatabaseHelper.COL_UPDATED_AT, updatedAt);
+            
+            if ("VENDIDO".equals(estado) && precioVenta != null && fechaVenta != null) {
+                values.put(DatabaseHelper.COL_PRECIO_VENTA, precioVenta);
+                values.put(DatabaseHelper.COL_FECHA_VENTA, fechaVenta);
+            }
 
             int rows = db.update(
                     DatabaseHelper.TABLE_ANIMALES,

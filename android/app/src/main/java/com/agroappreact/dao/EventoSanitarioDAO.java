@@ -130,6 +130,42 @@ public class EventoSanitarioDAO {
         
         return eventos;
     }
+
+    public List<EventoSanitario> obtenerEventosPorMes(int year, int month) {
+        List<EventoSanitario> eventos = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        String prefix = String.format(java.util.Locale.US, "%04d-%02d", year, month);
+        String like = prefix + "%";
+
+        Cursor cursor = null;
+        try {
+            String selection = DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " LIKE ? OR " + DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO + " LIKE ?";
+            String[] selectionArgs = new String[]{ like, like };
+
+            cursor = db.query(
+                DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
+                null,
+                selection,
+                selectionArgs,
+                null,
+                null,
+                DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC"
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    eventos.add(cursorToEvento(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return eventos;
+    }
     
     public boolean animalExiste(int animalId) {
         if (animalId <= 0) {

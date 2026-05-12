@@ -3,86 +3,99 @@ package com.agroappreact.dao;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.text.TextUtils;
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.EventoSanitario;
 import java.util.ArrayList;
 import java.util.List;
 
 public class EventoSanitarioDAO {
-    private DatabaseHelper dbHelper;
+    private final DatabaseHelper dbHelper;
     
     public EventoSanitarioDAO(DatabaseHelper dbHelper) {
         this.dbHelper = dbHelper;
     }
     
     public long insertarEvento(EventoSanitario evento) {
+        if (evento == null || !animalExiste(evento.getAnimalId())) {
+            return -1;
+        }
+
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
-        
-        if (evento.getAnimalId() > 0) {
-            values.put(DatabaseHelper.COL_CALENDARIO_ANIMAL_ID, evento.getAnimalId());
-        }
-        if (evento.getRaza() != null && !evento.getRaza().isEmpty()) {
-            values.put(DatabaseHelper.COL_CALENDARIO_RAZA, evento.getRaza());
-        }
-        values.put(DatabaseHelper.COL_CALENDARIO_TIPO, evento.getTipo());
-        values.put(DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA, evento.getFechaProgramada());
-        values.put(DatabaseHelper.COL_CALENDARIO_FECHA_REALIZADA, evento.getFechaRealizada());
-        values.put(DatabaseHelper.COL_CALENDARIO_DESCRIPCION, evento.getDescripcion());
-        values.put(DatabaseHelper.COL_CALENDARIO_RECORDATORIO, evento.getRecordatorio());
-        values.put(DatabaseHelper.COL_CALENDARIO_ESTADO, evento.getEstado());
-        values.put(DatabaseHelper.COL_CALENDARIO_HORA, evento.getHoraRecordatorio());
-        values.put(DatabaseHelper.COL_CALENDARIO_COSTO, evento.getCosto());
-        
-        return db.insert(DatabaseHelper.TABLE_CALENDARIO_SANITARIO, null, values);
+
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID, evento.getAnimalId());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_TIPO_EVENTO, evento.getTipoEvento());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_DESCRIPCION, evento.getDescripcion());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO, evento.getFechaEvento());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_VETERINARIO, evento.getVeterinario());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS, evento.getDosis());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES, evento.getObservaciones());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO, evento.getFechaProximoEvento());
+
+        return db.insert(DatabaseHelper.TABLE_EVENTOS_SANITARIOS, null, values);
     }
     
     public int actualizarEvento(EventoSanitario evento) {
+        if (evento == null || evento.getId() <= 0 || !animalExiste(evento.getAnimalId())) {
+            return 0;
+        }
+
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
-        
-        if (evento.getAnimalId() > 0) {
-            values.put(DatabaseHelper.COL_CALENDARIO_ANIMAL_ID, evento.getAnimalId());
-        }
-        if (evento.getRaza() != null && !evento.getRaza().isEmpty()) {
-            values.put(DatabaseHelper.COL_CALENDARIO_RAZA, evento.getRaza());
-        }
-        values.put(DatabaseHelper.COL_CALENDARIO_TIPO, evento.getTipo());
-        values.put(DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA, evento.getFechaProgramada());
-        values.put(DatabaseHelper.COL_CALENDARIO_FECHA_REALIZADA, evento.getFechaRealizada());
-        values.put(DatabaseHelper.COL_CALENDARIO_DESCRIPCION, evento.getDescripcion());
-        values.put(DatabaseHelper.COL_CALENDARIO_RECORDATORIO, evento.getRecordatorio());
-        values.put(DatabaseHelper.COL_CALENDARIO_ESTADO, evento.getEstado());
-        values.put(DatabaseHelper.COL_CALENDARIO_HORA, evento.getHoraRecordatorio());
-        values.put(DatabaseHelper.COL_CALENDARIO_COSTO, evento.getCosto());
-        
-        return db.update(DatabaseHelper.TABLE_CALENDARIO_SANITARIO, values,
-            DatabaseHelper.COL_CALENDARIO_ID + "=?",
-            new String[]{String.valueOf(evento.getId())});
+
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID, evento.getAnimalId());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_TIPO_EVENTO, evento.getTipoEvento());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_DESCRIPCION, evento.getDescripcion());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO, evento.getFechaEvento());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_VETERINARIO, evento.getVeterinario());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS, evento.getDosis());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES, evento.getObservaciones());
+        values.put(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO, evento.getFechaProximoEvento());
+
+        return db.update(
+            DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
+            values,
+            DatabaseHelper.COL_EVENTO_SANITARIO_ID + "=?",
+            new String[]{String.valueOf(evento.getId())}
+        );
     }
     
-    public int eliminarEvento(int id) {
+    public boolean eliminarEvento(int id) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
-        return db.delete(DatabaseHelper.TABLE_CALENDARIO_SANITARIO,
-            DatabaseHelper.COL_CALENDARIO_ID + "=?",
-            new String[]{String.valueOf(id)});
+        int rows = db.delete(
+            DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
+            DatabaseHelper.COL_EVENTO_SANITARIO_ID + "=?",
+            new String[]{String.valueOf(id)}
+        );
+        return rows > 0;
     }
     
     public List<EventoSanitario> obtenerTodosLosEventos() {
         List<EventoSanitario> eventos = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Cursor cursor = db.query(
-            DatabaseHelper.TABLE_CALENDARIO_SANITARIO,
-            null, null, null, null, null,
-            DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA + " ASC"
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                eventos.add(cursorToEvento(cursor));
-            } while (cursor.moveToNext());
-            cursor.close();
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query(
+                DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
+                null,
+                null,
+                null,
+                null,
+                null,
+                DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC"
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    eventos.add(cursorToEvento(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
         
         return eventos;
@@ -91,76 +104,69 @@ public class EventoSanitarioDAO {
     public List<EventoSanitario> obtenerEventosPorAnimal(int animalId) {
         List<EventoSanitario> eventos = new ArrayList<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Cursor cursor = db.query(
-            DatabaseHelper.TABLE_CALENDARIO_SANITARIO,
-            null,
-            DatabaseHelper.COL_CALENDARIO_ANIMAL_ID + "=?",
-            new String[]{String.valueOf(animalId)},
-            null, null,
-            DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA + " ASC"
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                eventos.add(cursorToEvento(cursor));
-            } while (cursor.moveToNext());
-            cursor.close();
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query(
+                DatabaseHelper.TABLE_EVENTOS_SANITARIOS,
+                null,
+                DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID + "=?",
+                new String[]{String.valueOf(animalId)},
+                null,
+                null,
+                DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO + " DESC"
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    eventos.add(cursorToEvento(cursor));
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
         
         return eventos;
     }
     
-    public List<EventoSanitario> obtenerEventosPendientes() {
-        List<EventoSanitario> eventos = new ArrayList<>();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
-        Cursor cursor = db.query(
-            DatabaseHelper.TABLE_CALENDARIO_SANITARIO,
-            null,
-            DatabaseHelper.COL_CALENDARIO_ESTADO + "=?",
-            new String[]{"Pendiente"},
-            null, null,
-            DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA + " ASC"
-        );
-        
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                eventos.add(cursorToEvento(cursor));
-            } while (cursor.moveToNext());
-            cursor.close();
+    public boolean animalExiste(int animalId) {
+        if (animalId <= 0) {
+            return false;
         }
-        
-        return eventos;
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(
+                DatabaseHelper.TABLE_ANIMALES,
+                new String[]{DatabaseHelper.COL_ANIMAL_ID},
+                DatabaseHelper.COL_ANIMAL_ID + "=?",
+                new String[]{String.valueOf(animalId)},
+                null,
+                null,
+                null
+            );
+            return cursor != null && cursor.moveToFirst();
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
     }
     
     private EventoSanitario cursorToEvento(Cursor cursor) {
-        EventoSanitario evento = new EventoSanitario(
-            cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_ID)),
-            cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_ANIMAL_ID)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_TIPO)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_FECHA_PROGRAMADA)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_FECHA_REALIZADA)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_DESCRIPCION)),
-            cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_RECORDATORIO)),
-            cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CALENDARIO_ESTADO))
-        );
-        
-        int horaIndex = cursor.getColumnIndex(DatabaseHelper.COL_CALENDARIO_HORA);
-        if (horaIndex != -1) {
-            evento.setHoraRecordatorio(cursor.getString(horaIndex));
-        }
-        
-        int costoIndex = cursor.getColumnIndex(DatabaseHelper.COL_CALENDARIO_COSTO);
-        if (costoIndex != -1) {
-            evento.setCosto(cursor.getDouble(costoIndex));
-        }
-        
-        int razaIndex = cursor.getColumnIndex(DatabaseHelper.COL_CALENDARIO_RAZA);
-        if (razaIndex != -1) {
-            evento.setRaza(cursor.getString(razaIndex));
-        }
-        
+        EventoSanitario evento = new EventoSanitario();
+        evento.setId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ID)));
+        evento.setAnimalId(cursor.getInt(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_ANIMAL_ID)));
+        evento.setTipoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_TIPO_EVENTO)));
+        evento.setDescripcion(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DESCRIPCION)));
+        evento.setFechaEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_EVENTO)));
+        evento.setVeterinario(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_VETERINARIO)));
+        evento.setDosis(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_DOSIS)));
+        evento.setObservaciones(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_OBSERVACIONES)));
+        evento.setFechaProximoEvento(cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EVENTO_SANITARIO_FECHA_PROXIMO_EVENTO)));
         return evento;
     }
 }

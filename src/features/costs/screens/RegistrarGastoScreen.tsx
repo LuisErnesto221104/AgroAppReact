@@ -15,9 +15,14 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeModules } from 'react-native';
 import { CategoriaGasto, CATEGORIA_GASTO_LABELS, InsertGastoPayload } from '../../../types/Costos';
-import { AnimalModel } from '../../../types/Animal';
 
-const { AgroBridgeModule } = NativeModules;
+const { AgroBridgeModule, AnimalModule } = NativeModules;
+
+interface AnimalBasico {
+  id: number;
+  arete: string;
+  especie: string;
+}
 
 interface RegistrarGastoScreenProps {
   onBack: () => void;
@@ -34,7 +39,7 @@ export function RegistrarGastoScreen({ onBack, onSuccess, gastoId }: RegistrarGa
   const [fecha, setFecha] = useState(new Date());
   const [notas, setNotas] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [animales, setAnimales] = useState<AnimalModel[]>([]);
+  const [animales, setAnimales] = useState<AnimalBasico[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
 
@@ -44,9 +49,9 @@ export function RegistrarGastoScreen({ onBack, onSuccess, gastoId }: RegistrarGa
 
   const cargarAnimales = async () => {
     try {
-      const resultado = await AgroBridgeModule.obtenerAnimales?.();
+      const resultado = await AnimalModule.listAnimals();
       if (resultado && Array.isArray(resultado)) {
-        setAnimales(resultado);
+        setAnimales(resultado as AnimalBasico[]);
       }
     } catch (error) {
       console.error('Error cargando animales:', error);
@@ -166,7 +171,7 @@ export function RegistrarGastoScreen({ onBack, onSuccess, gastoId }: RegistrarGa
           >
             <Text style={styles.buttonText}>
               {animalId
-                ? animales.find(a => a.id === animalId)?.nombre || `Animal #${animalId}`
+                ? animales.find(a => a.id === animalId)?.arete || `Animal #${animalId}`
                 : 'Seleccionar animal'}
             </Text>
           </TouchableOpacity>
@@ -288,7 +293,7 @@ export function RegistrarGastoScreen({ onBack, onSuccess, gastoId }: RegistrarGa
                   }}
                 >
                   <Text style={styles.animalOptionText}>
-                    {animal.nombre} (#{animal.numeroArete})
+                    {animal.arete} — {animal.especie}
                   </Text>
                 </TouchableOpacity>
               ))}

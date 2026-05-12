@@ -63,6 +63,8 @@ const INITIAL_FORM_STATE: AnimalFormState = {
   fecha: '',
   peso: '',
   fotoPath: null,
+  precioCompra: '',
+  nacioEnRancho: false,
 };
 
 export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScreenProps) {
@@ -171,6 +173,7 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
 
   const buildPayload = (): InsertAnimalPayload => {
     const pesoValue = form.peso.trim();
+    const precioValue = form.precioCompra.trim();
     return {
       arete: form.arete.trim(),
       especie: form.especie.trim(),
@@ -178,6 +181,7 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
       fecha: form.fecha.trim(),
       peso: pesoValue.length > 0 ? Number(pesoValue) : null,
       foto_path: form.fotoPath,
+      precio_compra: form.nacioEnRancho ? 0 : (precioValue.length > 0 ? Number(precioValue) : 0),
     };
   };
 
@@ -310,6 +314,38 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
           keyboardType="number-pad"
           maxLength={6}
         />
+
+        <Text style={styles.label}>Precio de compra</Text>
+        <View style={styles.origenContainer}>
+          <Pressable
+            style={[styles.origenChip, form.nacioEnRancho && styles.origenChipSelected]}
+            onPress={() => setForm(prev => ({ ...prev, nacioEnRancho: true, precioCompra: '' }))}
+          >
+            <Text style={[styles.origenChipText, form.nacioEnRancho && styles.origenChipTextSelected]}>
+              Nació en el rancho ($0)
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.origenChip, !form.nacioEnRancho && styles.origenChipSelected]}
+            onPress={() => setForm(prev => ({ ...prev, nacioEnRancho: false }))}
+          >
+            <Text style={[styles.origenChipText, !form.nacioEnRancho && styles.origenChipTextSelected]}>
+              Comprado
+            </Text>
+          </Pressable>
+        </View>
+        {!form.nacioEnRancho && (
+          <View style={styles.precioRow}>
+            <Text style={styles.precioSimbolo}>$</Text>
+            <TextInput
+              value={form.precioCompra}
+              onChangeText={value => setField('precioCompra', value.replace(/[^0-9.]/g, ''))}
+              placeholder="0.00"
+              style={styles.precioInput}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        )}
 
         <Text style={styles.label}>Fotografia del animal</Text>
         <AnimalFotoCaptura
@@ -608,5 +644,52 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
     fontSize: 16,
+  },
+  origenContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  origenChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#cfd9c3',
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  origenChipSelected: {
+    backgroundColor: '#0f6f35',
+    borderColor: '#0f6f35',
+  },
+  origenChipText: {
+    color: '#1c2b1d',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  origenChipTextSelected: {
+    color: '#ffffff',
+  },
+  precioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#b6c7a0',
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+  },
+  precioSimbolo: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f6f35',
+    marginRight: 6,
+  },
+  precioInput: {
+    flex: 1,
+    paddingVertical: 10,
+    color: '#1c2b1d',
+    fontSize: 15,
   },
 });

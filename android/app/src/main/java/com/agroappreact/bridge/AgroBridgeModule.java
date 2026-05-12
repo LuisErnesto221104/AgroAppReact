@@ -10,6 +10,7 @@ import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 
+import com.agroappreact.animales.AnimalDAO;
 import com.agroappreact.dao.EventoSanitarioDAO;
 import com.agroappreact.dao.HistorialClinicoDAO;
 import com.agroappreact.dao.HistorialItem;
@@ -43,6 +44,7 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     private final EventoSanitarioDAO eventoSanitarioDAO;
     private final HistorialClinicoDAO historialClinicoDAO;
     private final GastoDAO gastoDAO;
+    private final AnimalDAO animalDAO;
 
     public AgroBridgeModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -50,6 +52,7 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
         this.eventoSanitarioDAO = new EventoSanitarioDAO(databaseHelper);
         this.historialClinicoDAO = new HistorialClinicoDAO(databaseHelper);
         this.gastoDAO = new GastoDAO(databaseHelper);
+        this.animalDAO = new AnimalDAO(databaseHelper);
     }
 
     @Override
@@ -437,6 +440,73 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             WritableMap error = Arguments.createMap();
             error.putString("error", e.getMessage());
             promise.resolve(error);
+        }
+    }
+
+    // Sprint 4 — RF003: Resumen completo de inversión por animal + breakdown categorías
+    @ReactMethod
+    public void getResumenInversionAnimal(double animalIdDouble, Promise promise) {
+        try {
+            int animalId = (int) animalIdDouble;
+            android.database.sqlite.SQLiteDatabase db = databaseHelper.getReadableDatabase();
+
+            WritableMap margen = InversionCalculadora.getMargenRealAnimal(db, animalId);
+            GastoDAO.GastoResumen resumen = gastoDAO.getResumenPorAnimal(animalId);
+
+            // Serializar porCategoria como WritableMap
+            WritableMap porCategoriaMap = Arguments.createMap();
+            for (java.util.Map.Entry<String, Double> entry : resumen.porCategoria.entrySet()) {
+                porCategoriaMap.putDouble(entry.getKey(), entry.getValue());
+            }
+
+            margen.putMap("porCategoria", porCategoriaMap);
+            margen.putInt("cantidadRegistros", resumen.cantidadRegistros);
+            margen.putInt("animalId", animalId);
+
+            promise.resolve(margen);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    // Sprint 4 — RF003: Resumen global del hato
+    @ReactMethod
+    public void getResumenHato(Promise promise) {
+        try {
+            GastoDAO.GastoResumen resumen = gastoDAO.getResumenHato();
+
+            WritableMap porCategoriaMap = Arguments.createMap();
+            for (java.util.Map.Entry<String, Double> entry : resumen.porCategoria.entrySet()) {
+                porCategoriaMap.putDouble(entry.getKey(), entry.getValue());
+            }
+
+            WritableMap result = Arguments.createMap();
+            result.putDouble("totalGeneral", resumen.totalGeneral);
+            result.putInt("cantidadRegistros", resumen.cantidadRegistros);
+            result.putMap("porCategoria", porCategoriaMap);
+            promise.resolve(result);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    // Exponer lista de animales para selección en gastos
+    @ReactMethod
+    public void obtenerAnimales(Promise promise) {
+        try {
+            java.util.List<AnimalDAO.AnimalRecord> animals = animalDAO.listAnimals();
+            WritableArray array = Arguments.createArray();
+            for (AnimalDAO.AnimalRecord a : animals) {
+                WritableMap map = Arguments.createMap();
+                map.putDouble("id", a.id);
+                map.putString("arete", a.arete);
+                map.putString("especie", a.especie != null ? a.especie : "");
+                map.putString("estado", a.estado != null ? a.estado : "ACTIVO");
+                array.pushMap(map);
+            }
+            promise.resolve(array);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
         }
     }
 }

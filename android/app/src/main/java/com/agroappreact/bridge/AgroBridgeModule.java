@@ -11,6 +11,8 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 
 import com.agroappreact.dao.EventoSanitarioDAO;
+import com.agroappreact.dao.HistorialClinicoDAO;
+import com.agroappreact.dao.HistorialItem;
 import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.EventoSanitario;
 
@@ -35,11 +37,13 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
 
     private final DatabaseHelper databaseHelper;
     private final EventoSanitarioDAO eventoSanitarioDAO;
+    private final HistorialClinicoDAO historialClinicoDAO;
 
     public AgroBridgeModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.databaseHelper = DatabaseHelper.getInstance(reactContext);
         this.eventoSanitarioDAO = new EventoSanitarioDAO(databaseHelper);
+        this.historialClinicoDAO = new HistorialClinicoDAO(databaseHelper);
     }
 
     @Override
@@ -151,10 +155,45 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
         }
     }
 
+    @ReactMethod
+    public void getHistorialClinico(int animalId, int pagina, Promise promise) {
+        try {
+            validarAnimal(animalId);
+            final int porPagina = 10;
+            List<HistorialItem> items = historialClinicoDAO.obtenerHistorialCompleto(animalId, pagina, porPagina);
+            int total = historialClinicoDAO.contarEventos(animalId);
+
+            WritableArray array = Arguments.createArray();
+            for (HistorialItem h : items) {
+                WritableMap map = Arguments.createMap();
+                map.putInt("id", h.getId());
+                map.putInt("animalId", h.getAnimalId());
+                map.putString("arete", h.getArete());
+                map.putString("tipoEvento", h.getTipoEvento());
+                map.putString("descripcion", h.getDescripcion());
+                map.putString("fechaEvento", h.getFechaEvento());
+                map.putString("veterinario", h.getVeterinario());
+                map.putString("dosis", h.getDosis());
+                map.putString("observaciones", h.getObservaciones());
+                array.pushMap(map);
+            }
+
+            WritableMap result = Arguments.createMap();
+            result.putArray("items", array);
+            result.putInt("total", total);
+            promise.resolve(result);
+        } catch (Exception e) {
+            promise.reject("ERR_HISTORIAL_CLINICO", e.getMessage(), e);
+        }
+    }
+
     private WritableMap serializarEvento(EventoSanitario evento) {
         WritableMap map = Arguments.createMap();
         map.putInt("id", evento.getId());
         map.putInt("animalId", evento.getAnimalId());
+        if (evento.getArete() != null) {
+            map.putString("arete", evento.getArete());
+        }
         map.putString("tipoEvento", evento.getTipoEvento());
         map.putString("descripcion", evento.getDescripcion());
         map.putString("fechaEvento", evento.getFechaEvento());

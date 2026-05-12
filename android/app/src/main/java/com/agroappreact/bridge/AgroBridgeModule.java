@@ -1,16 +1,45 @@
 package com.agroappreact.bridge;
 
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.bridge.WritableArray;
+
+import com.agroappreact.dao.EventoSanitarioDAO;
+import com.agroappreact.database.DatabaseHelper;
+import com.agroappreact.models.EventoSanitario;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class AgroBridgeModule extends ReactContextBaseJavaModule {
 
+    private static final List<String> TIPOS_VALIDOS = Arrays.asList(
+        "VACUNA",
+        "DESPARASITACION",
+        "ENFERMEDAD",
+        "CIRUGIA",
+        "OTRO"
+    );
+
+    private final DatabaseHelper databaseHelper;
+    private final EventoSanitarioDAO eventoSanitarioDAO;
+
     public AgroBridgeModule(ReactApplicationContext reactContext) {
         super(reactContext);
+        this.databaseHelper = DatabaseHelper.getInstance(reactContext);
+        this.eventoSanitarioDAO = new EventoSanitarioDAO(databaseHelper);
     }
 
     @Override
@@ -44,6 +73,141 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             promise.resolve(info);
         } catch (Exception e) {
             promise.reject("BRIDGE_INFO_ERROR", "Fallo en getBridgeInfo: " + e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void registrarEventoSanitario(ReadableMap datos, Promise promise) {
+        try {
+            int animalId = leerEntero(datos, "animalId");
+            String tipoEvento = leerTexto(datos, "tipoEvento");
+            String descripcion = leerTexto(datos, "descripcion");
+            String veterinario = leerTexto(datos, "veterinario");
+            String dosis = leerTexto(datos, "dosis");
+            String observaciones = leerTexto(datos, "observaciones");
+            String fechaEvento = leerTexto(datos, "fechaEvento");
+            String fechaProximoEvento = leerTexto(datos, "fechaProximoEvento");
+
+            validarAnimal(animalId);
+            validarTipoEvento(tipoEvento);
+            validarFechas(fechaEvento, fechaProximoEvento);
+
+            EventoSanitario evento = new EventoSanitario();
+            evento.setAnimalId(animalId);
+            evento.setTipoEvento(tipoEvento);
+            evento.setDescripcion(descripcion);
+            evento.setFechaEvento(fechaEvento);
+            evento.setVeterinario(veterinario);
+            evento.setDosis(dosis);
+            evento.setObservaciones(observaciones);
+            evento.setFechaProximoEvento(fechaProximoEvento);
+
+            long eventoId = eventoSanitarioDAO.insertarEvento(evento);
+            if (eventoId <= 0) {
+                promise.reject("ERR_EVENTO_SANITARIO_INSERT", "No se pudo registrar el evento sanitario.");
+                return;
+            }
+
+            WritableMap resultado = Arguments.createMap();
+            resultado.putBoolean("ok", true);
+            resultado.putDouble("eventoId", (double) eventoId);
+            promise.resolve(resultado);
+        } catch (Exception e) {
+            promise.reject("ERR_EVENTO_SANITARIO", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void obtenerEventosSanitarios(int animalId, Promise promise) {
+        try {
+            validarAnimal(animalId);
+
+            List<EventoSanitario> eventos = eventoSanitarioDAO.obtenerEventosPorAnimal(animalId);
+            WritableArray array = Arguments.createArray();
+
+            for (EventoSanitario evento : eventos) {
+                array.pushMap(serializarEvento(evento));
+            }
+
+            promise.resolve(array);
+        } catch (Exception e) {
+            promise.reject("ERR_EVENTOS_SANITARIOS", e.getMessage(), e);
+        }
+    }
+
+    private WritableMap serializarEvento(EventoSanitario evento) {
+        WritableMap map = Arguments.createMap();
+        map.putInt("id", evento.getId());
+        map.putInt("animalId", evento.getAnimalId());
+        map.putString("tipoEvento", evento.getTipoEvento());
+        map.putString("descripcion", evento.getDescripcion());
+        map.putString("fechaEvento", evento.getFechaEvento());
+        map.putString("veterinario", evento.getVeterinario());
+        map.putString("dosis", evento.getDosis());
+        map.putString("observaciones", evento.getObservaciones());
+        map.putString("fechaProximoEvento", evento.getFechaProximoEvento());
+        return map;
+    }
+
+    private int leerEntero(ReadableMap datos, String clave) {
+        if (datos == null || !datos.hasKey(clave) || datos.isNull(clave)) {
+            throw new IllegalArgumentException("Falta el campo obligatorio: " + clave);
+        }
+        return datos.getInt(clave);
+    }
+
+    private String leerTexto(ReadableMap datos, String clave) {
+        if (datos == null || !datos.hasKey(clave) || datos.isNull(clave)) {
+            return null;
+        }
+        String valor = datos.getString(clave);
+        return valor == null ? null : valor.trim();
+    }
+
+    private void validarAnimal(int animalId) {
+        if (!eventoSanitarioDAO.animalExiste(animalId)) {
+            throw new IllegalArgumentException("El animal_id no existe.");
+        }
+    }
+
+    private void validarTipoEvento(String tipoEvento) {
+        if (tipoEvento == null || !TIPOS_VALIDOS.contains(tipoEvento.trim())) {
+            throw new IllegalArgumentException("tipoEvento debe ser uno de los valores permitidos.");
+        }
+    }
+
+    private void validarFechas(String fechaEvento, String fechaProximoEvento) throws ParseException {
+        Date fechaEventoDate = parseFecha(fechaEvento, "fechaEvento");
+        Date fechaProximoDate = parseFecha(fechaProximoEvento, "fechaProximoEvento");
+
+        Date hoy = truncarFecha(new Date());
+        if (fechaEventoDate.after(hoy)) {
+            throw new IllegalArgumentException("fecha_evento no puede ser futura.");
+        }
+
+        if (fechaProximoDate.before(fechaEventoDate)) {
+            throw new IllegalArgumentException("fecha_proximo_evento debe ser mayor o igual a fecha_evento.");
+        }
+    }
+
+    private Date parseFecha(String valor, String campo) throws ParseException {
+        if (valor == null || valor.trim().isEmpty()) {
+            throw new IllegalArgumentException("Falta el campo obligatorio: " + campo);
+        }
+
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        format.setLenient(false);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return truncarFecha(format.parse(valor.trim()));
+    }
+
+    private Date truncarFecha(Date fecha) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        try {
+            return format.parse(format.format(fecha));
+        } catch (ParseException e) {
+            return fecha;
         }
     }
 }

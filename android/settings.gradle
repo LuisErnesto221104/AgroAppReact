@@ -1,18 +1,14 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
 
-<<<<<<< HEAD
-def nodeBinary = System.getenv("NODE_BINARY") ?: "/home/ernesto/.net/Updates/oQz7oMoyWaxZ/.playwright/node/linux-x64/node"
-=======
 def nodeBinary = System.getenv("NODE_BINARY")
 if (nodeBinary == null || nodeBinary.trim().isEmpty()) {
 	nodeBinary = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "node.exe" : "node"
 }
 
 def reactNativeCli = new File(rootDir, "../node_modules/react-native/cli.js").absolutePath
->>>>>>> ccf08d8 (AnexoE_Sprint2)
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex ->
-	ex.autolinkLibrariesFromCommand([nodeBinary, "node_modules/react-native/cli.js", "config"])
+	ex.autolinkLibrariesFromCommand([nodeBinary, reactNativeCli, "config"])
 }
 rootProject.name = 'AgroAppReact'
 include ':app'

@@ -1,5 +1,7 @@
 import { NativeModules } from 'react-native';
 
+import type { EventoSanitarioModel, InsertEventoPayload, InsertEventoResult } from '../types/Sanitario';
+
 type BridgeInfo = {
   module: string;
   language: string;
@@ -10,6 +12,8 @@ type BridgeInfo = {
 type AgroBridgeNativeModule = {
   testConnection(nombre: string): Promise<string>;
   getBridgeInfo(): Promise<BridgeInfo>;
+  registrarEventoSanitario(datos: InsertEventoPayload): Promise<InsertEventoResult>;
+  obtenerEventosSanitarios(animalId: number): Promise<EventoSanitarioModel[]>;
 };
 
 // Obtenemos el modulo, pero no lanzamos error aqui en tiempo de carga.
@@ -35,4 +39,14 @@ export const probarBridge = (nombre: string): Promise<string> => {
 export const obtenerInfoBridge = (): Promise<BridgeInfo> => {
   const bridge = getBridge();
   return bridge.getBridgeInfo();
+};
+
+export const registrarEventoSanitario = (
+  datos: InsertEventoPayload,
+): Promise<InsertEventoResult> => {
+  return getBridge().registrarEventoSanitario(datos);
+};
+
+export const obtenerEventosSanitarios = (animalId: number): Promise<EventoSanitarioModel[]> => {
+  return getBridge().obtenerEventosSanitarios(animalId);
 };

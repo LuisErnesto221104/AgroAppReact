@@ -18,7 +18,7 @@ public class AnimalDAO {
         this.dbHelper = dbHelper;
     }
 
-    public long insertAnimal(String arete, String especie, String sexo, String fecha, Double peso, String fotoPath) {
+    public long insertAnimal(String arete, String especie, String sexo, String fecha, Double peso, String fotoPath, Double precioCompra) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         db.beginTransaction();
         try {
@@ -36,6 +36,11 @@ public class AnimalDAO {
             values.put(DatabaseHelper.COL_ESTADO, "ACTIVO");
             values.putNull(DatabaseHelper.COL_FECHA_BAJA);
             values.putNull(DatabaseHelper.COL_MOTIVO_BAJA);
+            if (precioCompra != null) {
+                values.put(DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA, precioCompra);
+            } else {
+                values.put(DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA, 0.0);
+            }
 
             long id = db.insertOrThrow(DatabaseHelper.TABLE_ANIMALES, null, values);
             db.setTransactionSuccessful();
@@ -365,6 +370,11 @@ public class AnimalDAO {
             record.motivoBaja = cursor.getString(motivoBajaColumnIndex);
         }
 
+        int precioCompraIdx = cursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA);
+        if (precioCompraIdx != -1 && !cursor.isNull(precioCompraIdx)) {
+            record.precioCompra = cursor.getDouble(precioCompraIdx);
+        }
+
         return record;
     }
 
@@ -375,23 +385,17 @@ public class AnimalDAO {
         boolean hasEstado = false;
         boolean hasFechaBaja = false;
         boolean hasMotivoBaja = false;
+        boolean hasPrecioCompra = false;
         Cursor cursor = db.rawQuery("PRAGMA table_info(" + DatabaseHelper.TABLE_ANIMALES + ")", null);
         try {
             if (cursor.moveToFirst()) {
                 do {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
-                    if (DatabaseHelper.COL_UPDATED_AT.equals(name)) {
-                        hasUpdatedAt = true;
-                    }
-                    if (DatabaseHelper.COL_ESTADO.equals(name)) {
-                        hasEstado = true;
-                    }
-                    if (DatabaseHelper.COL_FECHA_BAJA.equals(name)) {
-                        hasFechaBaja = true;
-                    }
-                    if (DatabaseHelper.COL_MOTIVO_BAJA.equals(name)) {
-                        hasMotivoBaja = true;
-                    }
+                    if (DatabaseHelper.COL_UPDATED_AT.equals(name)) hasUpdatedAt = true;
+                    if (DatabaseHelper.COL_ESTADO.equals(name)) hasEstado = true;
+                    if (DatabaseHelper.COL_FECHA_BAJA.equals(name)) hasFechaBaja = true;
+                    if (DatabaseHelper.COL_MOTIVO_BAJA.equals(name)) hasMotivoBaja = true;
+                    if (DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA.equals(name)) hasPrecioCompra = true;
                 } while (cursor.moveToNext());
             }
         } finally {
@@ -399,31 +403,24 @@ public class AnimalDAO {
         }
 
         if (!hasUpdatedAt) {
-            db.execSQL(
-                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
-                            " ADD COLUMN " + DatabaseHelper.COL_UPDATED_AT + " TEXT"
-            );
+            db.execSQL("ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                    " ADD COLUMN " + DatabaseHelper.COL_UPDATED_AT + " TEXT");
         }
-
         if (!hasEstado) {
-            db.execSQL(
-                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
-                            " ADD COLUMN " + DatabaseHelper.COL_ESTADO + " TEXT DEFAULT 'ACTIVO'"
-            );
+            db.execSQL("ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                    " ADD COLUMN " + DatabaseHelper.COL_ESTADO + " TEXT DEFAULT 'ACTIVO'");
         }
-
         if (!hasFechaBaja) {
-            db.execSQL(
-                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
-                            " ADD COLUMN " + DatabaseHelper.COL_FECHA_BAJA + " TEXT"
-            );
+            db.execSQL("ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                    " ADD COLUMN " + DatabaseHelper.COL_FECHA_BAJA + " TEXT");
         }
-
         if (!hasMotivoBaja) {
-            db.execSQL(
-                    "ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
-                            " ADD COLUMN " + DatabaseHelper.COL_MOTIVO_BAJA + " TEXT"
-            );
+            db.execSQL("ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                    " ADD COLUMN " + DatabaseHelper.COL_MOTIVO_BAJA + " TEXT");
+        }
+        if (!hasPrecioCompra) {
+            db.execSQL("ALTER TABLE " + DatabaseHelper.TABLE_ANIMALES +
+                    " ADD COLUMN " + DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA + " REAL DEFAULT 0");
         }
 
         db.execSQL(DatabaseHelper.areteIndexDDL());
@@ -469,6 +466,7 @@ public class AnimalDAO {
         public String estado;
         public String fechaBaja;
         public String motivoBaja;
+        public Double precioCompra;
     }
 
     public static class PesoRecord {

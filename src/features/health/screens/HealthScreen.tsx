@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View, ActivityIndicator, TextInput, Modal,
 import CalendarioSanitario from '../../../screens/sanitarios/CalendarioSanitario';
 import { RegistrarEventoSanitario } from '../../../screens/sanitarios/RegistrarEventoSanitario';
 import { NotificationsScreen } from '../../../features/notifications/screens/NotificationsScreen';
+import { RecomendacionesNutricionales } from '../../../screens/nutricion/RecomendacionesNutricionales';
 import { obtenerEventosMes } from '../../../native/BridgeModule';
 import { EventoSanitarioItem } from '../../../components/animales/EventoSanitarioItem';
 import { EventoDetailModal } from '../../../components/EventoDetailModal';
@@ -14,7 +15,7 @@ type HealthScreenProps = {
 };
 
 export function HealthScreen({ onBack }: HealthScreenProps) {
-  const [view, setView] = useState<'lista' | 'registro'>('lista');
+  const [view, setView] = useState<'lista' | 'registro' | 'nutricion'>('lista');
   const [eventsList, setEventsList] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [filter, setFilter] = useState<'pendientes' | 'historial' | 'vacunas'>('pendientes');
@@ -109,6 +110,10 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
     return groups;
   }, [filteredEvents, filter]);
 
+  if (view === 'nutricion') {
+    return <RecomendacionesNutricionales onBack={() => setView('lista')} />;
+  }
+
   if (view === 'registro') {
     return (
       <RegistrarEventoSanitario
@@ -178,6 +183,9 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
         </Pressable>
         <Pressable style={styles.chipIcon} onPress={() => setShowNotificationsModal(true)}>
           <Text style={styles.chipText}>🔔 Notificaciones</Text>
+        </Pressable>
+        <Pressable style={[styles.chipIcon, styles.chipNutricion]} onPress={() => setView('nutricion')}>
+          <Text style={styles.chipNutricionText}>🌿 Nutrición</Text>
         </Pressable>
       </ScrollView>
 
@@ -392,6 +400,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e6e6e6',
+  },
+  chipNutricion: {
+    backgroundColor: '#e8f5ec',
+    borderColor: '#07612d',
+  },
+  chipNutricionText: {
+    color: '#07612d',
+    fontFamily: FONTS.semiBold,
+    fontSize: 9.5,
   },
   sectionTitle: {
     fontFamily: FONTS.bold,

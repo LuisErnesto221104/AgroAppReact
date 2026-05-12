@@ -6,28 +6,32 @@ import com.agroappreact.database.DatabaseHelper;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.Arguments;
 
-/**
- * Sprint 3 — RF002: Cálculo de inversión y margen para animales
- */
 public class InversionCalculadora {
 
+    public static double calcularMargen(double inversion, double precioVenta) {
+        return precioVenta - inversion;
+    }
+
+    /**
+     * Calcula el margen real de un animal.
+     * precio_compra se obtiene directamente de animales.precio_compra.
+     * totalGastos es la suma de todos los gastos registrados para ese animal.
+     */
     public static WritableMap getMargenRealAnimal(SQLiteDatabase db, long animalId) {
         WritableMap result = Arguments.createMap();
-
         try {
-            // Obtener datos básicos del animal
+            // 1. Datos del animal
             Cursor animalCursor = db.query(
-                    DatabaseHelper.TABLE_ANIMALES,
-                    new String[]{
-                            DatabaseHelper.COL_ANIMAL_ID,
-                            DatabaseHelper.COL_ANIMAL_ARETE,
-                            DatabaseHelper.COL_ANIMAL_ESTADO,
-                            DatabaseHelper.COL_ANIMAL_PRECIO_VENTA,
-                            DatabaseHelper.COL_ANIMAL_FECHA_VENTA
-                    },
-                    DatabaseHelper.COL_ANIMAL_ID + "=?",
-                    new String[]{String.valueOf(animalId)},
-                    null, null, null
+                DatabaseHelper.TABLE_ANIMALES,
+                new String[]{
+                    DatabaseHelper.COL_ANIMAL_ESTADO,
+                    DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA,
+                    DatabaseHelper.COL_ANIMAL_PRECIO_VENTA,
+                    DatabaseHelper.COL_ANIMAL_FECHA_VENTA
+                },
+                DatabaseHelper.COL_ANIMAL_ID + "=?",
+                new String[]{String.valueOf(animalId)},
+                null, null, null
             );
 
             if (!animalCursor.moveToFirst()) {
@@ -37,50 +41,46 @@ public class InversionCalculadora {
                 return result;
             }
 
-            String estado = animalCursor.getString(animalCursor.getColumnIndexOrThrow(DatabaseHelper.COL_ANIMAL_ESTADO));
-            int estadoColumn = animalCursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PRECIO_VENTA);
-            int fechaVentaColumn = animalCursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_FECHA_VENTA);
+            String estado = animalCursor.getString(
+                animalCursor.getColumnIndexOrThrow(DatabaseHelper.COL_ANIMAL_ESTADO));
 
-            double precioVenta = 0;
-            String fechaVenta = null;
+            int colCompra = animalCursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PRECIO_COMPRA);
+            double precioCompra = (colCompra != -1 && !animalCursor.isNull(colCompra))
+                ? animalCursor.getDouble(colCompra) : 0;
 
-            if (estadoColumn != -1 && !animalCursor.isNull(estadoColumn)) {
-                precioVenta = animalCursor.getDouble(estadoColumn);
-            }
+            int colVenta = animalCursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_PRECIO_VENTA);
+            double precioVenta = (colVenta != -1 && !animalCursor.isNull(colVenta))
+                ? animalCursor.getDouble(colVenta) : 0;
 
-            if (fechaVentaColumn != -1 && !animalCursor.isNull(fechaVentaColumn)) {
-                fechaVenta = animalCursor.getString(fechaVentaColumn);
-            }
+            int colFechaVenta = animalCursor.getColumnIndex(DatabaseHelper.COL_ANIMAL_FECHA_VENTA);
+            String fechaVenta = (colFechaVenta != -1 && !animalCursor.isNull(colFechaVenta))
+                ? animalCursor.getString(colFechaVenta) : null;
 
             animalCursor.close();
 
-            // Calcular inversión total (compra + gastos sanitarios y de alimentación)
-            Cursor inversionCursor = db.rawQuery(
-                    "SELECT " +
-                            "COALESCE(MAX(CASE WHEN " + DatabaseHelper.COL_GASTO_TIPO + "='COMPRA' THEN " + DatabaseHelper.COL_GASTO_MONTO + " ELSE 0 END), 0) as compra, " +
-                            "COALESCE(SUM(CASE WHEN " + DatabaseHelper.COL_GASTO_TIPO + " IN ('SANITARIO', 'ALIMENTACION') THEN " + DatabaseHelper.COL_GASTO_MONTO + " ELSE 0 END), 0) as gastos " +
-                            "FROM " + DatabaseHelper.TABLE_GASTOS + " WHERE " + DatabaseHelper.COL_GASTO_ANIMAL_ID + " = ?",
-                    new String[]{String.valueOf(animalId)}
+            // 2. Suma total de gastos registrados para este animal
+            Cursor gastosCursor = db.rawQuery(
+                "SELECT COALESCE(SUM(" + DatabaseHelper.COL_GASTO_MONTO + "), 0) AS total" +
+                " FROM " + DatabaseHelper.TABLE_GASTOS +
+                " WHERE " + DatabaseHelper.COL_GASTO_ANIMAL_ID + "=?",
+                new String[]{String.valueOf(animalId)}
             );
 
-            double precioCompra = 0;
             double sumaGastos = 0;
-
-            if (inversionCursor.moveToFirst()) {
-                precioCompra = inversionCursor.getDouble(0);
-                sumaGastos = inversionCursor.getDouble(1);
+            if (gastosCursor.moveToFirst()) {
+                sumaGastos = gastosCursor.getDouble(0);
             }
-
-            inversionCursor.close();
+            gastosCursor.close();
 
             double inversionTotal = precioCompra + sumaGastos;
-            boolean esGanancia = precioVenta > inversionTotal;
-            double margen = Math.abs(precioVenta - inversionTotal);
-            double porcentaje = inversionTotal > 0 ? (margen / inversionTotal) * 100 : 0;
+            double margen = calcularMargen(inversionTotal, precioVenta);
+            boolean esGanancia = margen >= 0;
+            double porcentaje = inversionTotal > 0
+                ? (Math.abs(margen) / inversionTotal) * 100 : 0;
 
-            result.putDouble("inversionTotal", inversionTotal);
             result.putDouble("precioCompra", precioCompra);
             result.putDouble("sumaGastos", sumaGastos);
+            result.putDouble("inversionTotal", inversionTotal);
             result.putDouble("precioVenta", precioVenta);
             result.putDouble("margen", margen);
             result.putDouble("porcentaje", porcentaje);
@@ -89,8 +89,8 @@ public class InversionCalculadora {
             if (fechaVenta != null) {
                 result.putString("fechaVenta", fechaVenta);
             }
-
             return result;
+
         } catch (Exception e) {
             result.putString("error", e.getMessage());
             return result;

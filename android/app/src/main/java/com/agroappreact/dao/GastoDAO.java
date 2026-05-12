@@ -8,7 +8,9 @@ import com.agroappreact.database.DatabaseHelper;
 import com.agroappreact.models.Gasto;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * DAO para gestionar gastos del hato o por animal.
@@ -244,36 +246,101 @@ public class GastoDAO {
     }
     
     /**
-     * Obtiene el total de gastos por categoría
-     * @return Map de categoría -> total
+     * Obtiene el total de gastos por categoría (global)
      */
-    public java.util.Map<String, Double> obtenerTotalPorCategoria() {
-        java.util.Map<String, Double> resultado = new java.util.HashMap<>();
+    public Map<String, Double> obtenerTotalPorCategoria() {
+        Map<String, Double> resultado = new HashMap<>();
         SQLiteDatabase db = dbHelper.getReadableDatabase();
-        
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(
                 "SELECT " + DatabaseHelper.COL_GASTO_CATEGORIA + ", " +
-                "SUM(" + DatabaseHelper.COL_GASTO_MONTO + ") as total FROM " + 
+                "SUM(" + DatabaseHelper.COL_GASTO_MONTO + ") as total FROM " +
                 DatabaseHelper.TABLE_GASTOS + " GROUP BY " + DatabaseHelper.COL_GASTO_CATEGORIA,
                 null
             );
-            
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    String categoria = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_GASTO_CATEGORIA));
+                    String cat = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_GASTO_CATEGORIA));
                     double total = cursor.getDouble(cursor.getColumnIndexOrThrow("total"));
-                    resultado.put(categoria, total);
+                    resultado.put(cat, total);
                 } while (cursor.moveToNext());
             }
         } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
+            if (cursor != null) cursor.close();
         }
-        
         return resultado;
+    }
+
+    /**
+     * Resumen de gastos de un animal específico, agrupado por categoría.
+     */
+    public GastoResumen getResumenPorAnimal(int animalId) {
+        GastoResumen resumen = new GastoResumen();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                "SELECT " + DatabaseHelper.COL_GASTO_CATEGORIA +
+                ", SUM(" + DatabaseHelper.COL_GASTO_MONTO + ") AS total" +
+                ", COUNT(*) AS cantidad" +
+                " FROM " + DatabaseHelper.TABLE_GASTOS +
+                " WHERE " + DatabaseHelper.COL_GASTO_ANIMAL_ID + "=?" +
+                " GROUP BY " + DatabaseHelper.COL_GASTO_CATEGORIA,
+                new String[]{String.valueOf(animalId)}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String cat = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_GASTO_CATEGORIA));
+                    double total = cursor.getDouble(cursor.getColumnIndexOrThrow("total"));
+                    int cantidad = cursor.getInt(cursor.getColumnIndexOrThrow("cantidad"));
+                    resumen.porCategoria.put(cat, total);
+                    resumen.totalGeneral += total;
+                    resumen.cantidadRegistros += cantidad;
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return resumen;
+    }
+
+    /**
+     * Resumen global del hato (todos los gastos), agrupado por categoría.
+     */
+    public GastoResumen getResumenHato() {
+        GastoResumen resumen = new GastoResumen();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                "SELECT " + DatabaseHelper.COL_GASTO_CATEGORIA +
+                ", SUM(" + DatabaseHelper.COL_GASTO_MONTO + ") AS total" +
+                ", COUNT(*) AS cantidad" +
+                " FROM " + DatabaseHelper.TABLE_GASTOS +
+                " GROUP BY " + DatabaseHelper.COL_GASTO_CATEGORIA,
+                null
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String cat = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_GASTO_CATEGORIA));
+                    double total = cursor.getDouble(cursor.getColumnIndexOrThrow("total"));
+                    int cantidad = cursor.getInt(cursor.getColumnIndexOrThrow("cantidad"));
+                    resumen.porCategoria.put(cat, total);
+                    resumen.totalGeneral += total;
+                    resumen.cantidadRegistros += cantidad;
+                } while (cursor.moveToNext());
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return resumen;
+    }
+
+    public static class GastoResumen {
+        public double totalGeneral = 0;
+        public Map<String, Double> porCategoria = new HashMap<>();
+        public int cantidadRegistros = 0;
     }
     
     /**

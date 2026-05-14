@@ -133,11 +133,11 @@ export function RegistrarGastoScreen({ onBack, onSuccess, gastoId }: RegistrarGa
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 90 }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.backButton}>← Atrás</Text>
-        </TouchableOpacity>
+        <Pressable onPress={onBack} style={styles.backButtonWrap}>
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </Pressable>
         <Text style={styles.title}>{gastoId ? 'Editar Gasto' : 'Registrar Gasto'}</Text>
       </View>
 
@@ -323,11 +323,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  backButton: {
-    fontSize: 16,
+  backButtonWrap: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#e8f5ec',
+    marginRight: 12,
+  },
+  backButtonText: {
+    fontSize: 14,
     color: '#07612d',
     fontFamily: 'Poppins-SemiBold',
-    marginRight: 12,
   },
   title: {
     fontSize: 24,

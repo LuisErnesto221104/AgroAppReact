@@ -131,8 +131,9 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void obtenerEventosSanitarios(int animalId, Promise promise) {
+    public void obtenerEventosSanitarios(double animalIdDouble, Promise promise) {
         try {
+            int animalId = (int) animalIdDouble;
             validarAnimal(animalId);
 
             List<EventoSanitario> eventos = eventoSanitarioDAO.obtenerEventosPorAnimal(animalId);
@@ -165,8 +166,10 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void getHistorialClinico(int animalId, int pagina, Promise promise) {
+    public void getHistorialClinico(double animalIdDouble, double paginaDouble, Promise promise) {
         try {
+            int animalId = (int) animalIdDouble;
+            int pagina = (int) paginaDouble;
             validarAnimal(animalId);
             final int porPagina = 10;
             List<HistorialItem> items = historialClinicoDAO.obtenerHistorialCompleto(animalId, pagina, porPagina);
@@ -277,7 +280,7 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             String descripcion = datos.getString("descripcion");
             double monto = datos.getDouble("monto");
             String fecha = datos.getString("fecha");
-            String notas = datos.hasKey("notas") ? datos.getString("notas") : null;
+            String notas = datos.hasKey("notas") && !datos.isNull("notas") ? datos.getString("notas") : null;
 
             if (categoria == null || descripcion == null || fecha == null) {
                 promise.reject("ERROR", "Faltan campos obligatorios");
@@ -293,7 +296,7 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             long id = gastoDAO.insertarGasto(gasto);
 
             if (id > 0) {
-                promise.resolve(id);
+                promise.resolve((double) id);
             } else {
                 promise.reject("ERROR", "No se pudo insertar el gasto");
             }
@@ -303,8 +306,9 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void getGastosPorAnimal(int animalId, Promise promise) {
+    public void getGastosPorAnimal(double animalIdDouble, Promise promise) {
         try {
+            int animalId = (int) animalIdDouble;
             List<Gasto> gastos = gastoDAO.obtenerGastosPorAnimal(animalId);
             WritableArray array = Arguments.createArray();
 
@@ -365,7 +369,7 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
             String descripcion = datos.getString("descripcion");
             double monto = datos.getDouble("monto");
             String fecha = datos.getString("fecha");
-            String notas = datos.hasKey("notas") ? datos.getString("notas") : null;
+            String notas = datos.hasKey("notas") && !datos.isNull("notas") ? datos.getString("notas") : null;
 
             if (monto < 0) {
                 promise.reject("ERROR", "El monto no puede ser negativo");
@@ -386,8 +390,9 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void deleteGasto(int id, Promise promise) {
+    public void deleteGasto(double idDouble, Promise promise) {
         try {
+            int id = (int) idDouble;
             boolean eliminado = gastoDAO.eliminarGasto(id);
             promise.resolve(eliminado);
         } catch (Exception e) {
@@ -396,8 +401,9 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void sumarGastosPorAnimal(int animalId, Promise promise) {
+    public void sumarGastosPorAnimal(double animalIdDouble, Promise promise) {
         try {
+            int animalId = (int) animalIdDouble;
             double total = gastoDAO.sumarGastosPorAnimal(animalId);
             promise.resolve(total);
         } catch (Exception e) {

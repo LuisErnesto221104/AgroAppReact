@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -11,30 +11,25 @@ import {
   TextInput,
   View,
   Switch,
+  ActivityIndicator,
   NativeModules,
 } from 'react-native';
 
 import { useEventoSanitario } from '../../hooks/useEventoSanitario';
+import { AnimalModule } from '../../native/AnimalModule';
 import { programarNotificacionEvento } from '../../shared/services/notificacionSanitaria';
 import { COLORS, FONTS } from '../../shared/theme/identity';
 import { TipoEvento } from '../../types/Sanitario';
+import type { AnimalModel } from '../../types/Animal';
 
 const TIPOS_EVENTO = Object.values(TipoEvento);
 const MONTH_NAMES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const WEEKDAY_LABELS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+
+type AnimalSeleccionado = { id: number; arete: string };
 
 type RegistrarEventoSanitarioProps = {
   onBack: () => void;
@@ -42,7 +37,6 @@ type RegistrarEventoSanitarioProps = {
 };
 
 type FormState = {
-  animalIdInput: string;
   tipoEvento: TipoEvento;
   subtipo: string;
   descripcion: string;
@@ -55,7 +49,6 @@ type FormState = {
 };
 
 const INITIAL_FORM: FormState = {
-  animalIdInput: '',
   tipoEvento: TipoEvento.VACUNA,
   subtipo: '',
   descripcion: '',
@@ -81,16 +74,19 @@ const formatDate = (date: Date) => {
 const parseDate = (value: string) => new Date(`${value}T00:00:00`);
 
 const normalizeToday = (date: Date) => {
-  const candidate = new Date(date);
-  candidate.setHours(0, 0, 0, 0);
-  return candidate;
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
 
-const validateInline = (form: FormState, animalIdResolved: number | null) => {
-  const errors: Partial<Record<keyof FormState | 'general', string>> = {};
+const isFutureDate = (date: Date) => normalizeToday(date).getTime() > normalizeToday(new Date()).getTime();
+const isPastDate = (date: Date) => normalizeToday(date).getTime() < normalizeToday(new Date()).getTime();
 
-  if (!animalIdResolved || animalIdResolved <= 0) {
-    errors.animalIdInput = 'Ingresa un arete valido.';
+const validateForm = (form: FormState, animalesCount: number) => {
+  const errors: Record<string, string> = {};
+
+  if (animalesCount === 0) {
+    errors.animales = 'Selecciona al menos un animal.';
   }
 
   if (!TIPOS_EVENTO.includes(form.tipoEvento)) {
@@ -103,23 +99,23 @@ const validateInline = (form: FormState, animalIdResolved: number | null) => {
 
   if (!form.fechaEvento) {
     errors.fechaEvento = 'Selecciona la fecha del evento.';
+  } else if (isFutureDate(parseDate(form.fechaEvento))) {
+    errors.fechaEvento = 'La fecha del evento no puede ser futura.';
   }
 
   if (!form.fechaProximoEvento) {
     errors.fechaProximoEvento = 'Selecciona la proxima fecha.';
-  }
-
-  if (form.fechaEvento && form.fechaProximoEvento) {
-    const fechaEvento = parseDate(form.fechaEvento);
+  } else {
     const fechaProximo = parseDate(form.fechaProximoEvento);
     const today = normalizeToday(new Date());
-
-    if (fechaEvento.getTime() > today.getTime()) {
-      errors.fechaEvento = 'La fecha no puede ser futura.';
+    if (fechaProximo.getTime() < today.getTime()) {
+      errors.fechaProximoEvento = 'La proxima fecha no puede ser pasada.';
     }
-
-    if (fechaProximo.getTime() < fechaEvento.getTime()) {
-      errors.fechaProximoEvento = 'La fecha proxima debe ser mayor o igual a la inicial.';
+    if (form.fechaEvento) {
+      const fechaEvento = parseDate(form.fechaEvento);
+      if (fechaProximo.getTime() < fechaEvento.getTime()) {
+        errors.fechaProximoEvento = 'La fecha proxima debe ser mayor o igual a la del evento.';
+      }
     }
   }
 
@@ -127,39 +123,58 @@ const validateInline = (form: FormState, animalIdResolved: number | null) => {
 };
 
 export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSanitarioProps) {
-  const [form, setForm] = useState<FormState>(() => ({
-    ...INITIAL_FORM,
-    animalIdInput: animalId ? String(animalId) : '',
-  }));
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(true);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState | 'general', string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [calendarTarget, setCalendarTarget] = useState<'fechaEvento' | 'fechaProximoEvento' | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [listVisible, setListVisible] = useState(false);
 
+  // Multi-animal selector
+  const [animalesSeleccionados, setAnimalesSeleccionados] = useState<AnimalSeleccionado[]>([]);
+  const [areteSearch, setAreteSearch] = useState('');
+  const [sugerencias, setSugerencias] = useState<AnimalModel[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { loading, error, eventos, registrar, listar } = useEventoSanitario();
 
-  const animalIdResolved = useMemo(() => {
-    const raw = animalId ?? Number.parseInt(form.animalIdInput, 10);
-    return Number.isFinite(raw) && raw > 0 ? raw : null;
-  }, [animalId, form.animalIdInput]);
-
+  // Carga el animal inicial si se recibe animalId por prop
   useEffect(() => {
-    if (!animalIdResolved) {
-      return;
-    }
+    if (!animalId) return;
+    const cargar = async () => {
+      try {
+        const animal = await AnimalModule.getAnimalById(animalId);
+        if (animal.estado !== 'ACTIVO') {
+          Alert.alert(
+            'Animal no activo',
+            `El animal #${animal.arete} está ${animal.estado.toLowerCase()} y no puede recibir nuevos eventos sanitarios.`,
+            [{ text: 'OK', onPress: onBack }],
+          );
+          return;
+        }
+        setAnimalesSeleccionados([{ id: animal.id, arete: animal.arete }]);
+      } catch {
+        setAnimalesSeleccionados([{ id: animalId, arete: `ID:${animalId}` }]);
+      }
+    };
+    void cargar();
+  }, [animalId]);
 
-    void listar(animalIdResolved).then(() => {
-      setListVisible(true);
-    }).catch(() => {
-      setListVisible(false);
-    });
-  }, [animalIdResolved, listar]);
-
-  // Calcular próxima fecha según NOM-041 cuando cambien tipoEvento, subtipo o fechaEvento
+  // Cargar eventos del primer animal seleccionado para mostrar historial
   useEffect(() => {
-    const calcularFecha = async () => {
+    const primerAnimal = animalesSeleccionados[0];
+    if (!primerAnimal) return;
+
+    void listar(primerAnimal.id)
+      .then(() => setListVisible(true))
+      .catch(() => setListVisible(false));
+  }, [animalesSeleccionados, listar]);
+
+  // Calcular próxima fecha NOM-041
+  useEffect(() => {
+    const calcular = async () => {
       if (
         form.tipoEvento &&
         form.subtipo &&
@@ -170,18 +185,61 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
           const proximaFecha = await NativeModules.AgroBridgeModule.calcularProximaFechaNOM(
             form.tipoEvento,
             form.subtipo,
-            form.fechaEvento
+            form.fechaEvento,
           );
           if (proximaFecha) {
             setForm(prev => ({ ...prev, fechaProximoEventoSugerida: proximaFecha }));
           }
-        } catch (e) {
-          // Si falla el cálculo, dejamos que el usuario ingrese manualmente
+        } catch {
+          // Si falla el cálculo el usuario ingresa manualmente
         }
       }
     };
-    calcularFecha();
+    void calcular();
   }, [form.tipoEvento, form.subtipo, form.fechaEvento]);
+
+  // Búsqueda por arete con debounce
+  const handleAreteSearch = useCallback(
+    (term: string) => {
+      const sanitized = term.replace(/\D/g, '').slice(0, 10);
+      setAreteSearch(sanitized);
+      setSugerencias([]);
+
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+
+      if (sanitized.length < 2) return;
+
+      searchTimer.current = setTimeout(async () => {
+        setBuscando(true);
+        try {
+          const resultados = await AnimalModule.buscarPorArete(sanitized, 'ACTIVO');
+          // Excluir los ya seleccionados
+          const filtrados = resultados.filter(a => !animalesSeleccionados.find(sel => sel.id === a.id));
+          setSugerencias(filtrados);
+        } catch {
+          setSugerencias([]);
+        } finally {
+          setBuscando(false);
+        }
+      }, 400);
+    },
+    [animalesSeleccionados],
+  );
+
+  const agregarAnimal = (animal: AnimalModel) => {
+    if (!animalesSeleccionados.find(a => a.id === animal.id)) {
+      setAnimalesSeleccionados(prev => [...prev, { id: animal.id, arete: animal.arete }]);
+    }
+    setAreteSearch('');
+    setSugerencias([]);
+    setFieldErrors(prev => ({ ...prev, animales: '' }));
+  };
+
+  const removerAnimal = (id: number) => {
+    // No se puede remover el animal fijado por prop
+    if (id === animalId) return;
+    setAnimalesSeleccionados(prev => prev.filter(a => a.id !== id));
+  };
 
   const setField = (key: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -202,27 +260,14 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells: Array<Date | null> = [];
 
-    for (let index = 0; index < firstDay; index += 1) {
-      cells.push(null);
-    }
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      cells.push(new Date(year, month, day));
-    }
+    for (let index = 0; index < firstDay; index += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) cells.push(new Date(year, month, day));
 
     return cells;
   };
 
-  const isFutureDate = (date: Date) => {
-    const today = normalizeToday(new Date());
-    return normalizeToday(date).getTime() > today.getTime();
-  };
-
   const canGoNextMonth = () => {
-    if (calendarTarget === 'fechaProximoEvento') {
-      return true;
-    }
-
+    if (calendarTarget === 'fechaProximoEvento') return true;
     const now = new Date();
     return (
       calendarMonth.getFullYear() < now.getFullYear() ||
@@ -231,12 +276,15 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
   };
 
   const selectDate = (date: Date) => {
-    if (!calendarTarget) {
-      return;
-    }
+    if (!calendarTarget) return;
 
     if (calendarTarget === 'fechaEvento' && isFutureDate(date)) {
       Alert.alert('Fecha invalida', 'La fecha del evento no puede ser futura.');
+      return;
+    }
+
+    if (calendarTarget === 'fechaProximoEvento' && isPastDate(date)) {
+      Alert.alert('Fecha invalida', 'La proxima fecha no puede ser pasada.');
       return;
     }
 
@@ -245,57 +293,73 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
   };
 
   const onSubmit = async () => {
-    const errors = validateInline(form, animalIdResolved);
+    const errors = validateForm(form, animalesSeleccionados.length);
     setFieldErrors(errors);
 
-    if (Object.keys(errors).length > 0 || !animalIdResolved) {
-      return;
+    if (Object.keys(errors).filter(k => errors[k]).length > 0) return;
+
+    let exitosos = 0;
+    const fallidos: string[] = [];
+
+    for (const animal of animalesSeleccionados) {
+      try {
+        await registrar({
+          animalId: animal.id,
+          tipoEvento: form.tipoEvento,
+          descripcion: form.descripcion.trim(),
+          veterinario: form.veterinario.trim(),
+          dosis: form.dosis.trim(),
+          observaciones: form.observaciones.trim(),
+          fechaEvento: form.fechaEvento,
+          fechaProximoEvento: form.fechaProximoEvento,
+        });
+
+        if (reminderEnabled && form.fechaProximoEvento) {
+          try {
+            await programarNotificacionEvento({
+              id: 0,
+              animalId: animal.id,
+              tipoEvento: form.tipoEvento,
+              descripcion: form.descripcion.trim() || null,
+              fechaEvento: form.fechaEvento,
+              veterinario: form.veterinario.trim() || null,
+              dosis: form.dosis.trim() || null,
+              observaciones: form.observaciones.trim() || null,
+              fechaProximoEvento: form.fechaProximoEvento,
+            });
+          } catch {
+            // No bloqueamos el guardado si la notificación falla
+          }
+        }
+
+        exitosos++;
+      } catch {
+        fallidos.push(animal.arete);
+      }
     }
 
-    try {
-      await registrar({
-        animalId: animalIdResolved,
-        tipoEvento: form.tipoEvento,
-        descripcion: form.descripcion.trim(),
-        veterinario: form.veterinario.trim(),
-        dosis: form.dosis.trim(),
-        observaciones: form.observaciones.trim(),
-        fechaEvento: form.fechaEvento,
-        fechaProximoEvento: form.fechaProximoEvento,
-      });
+    if (exitosos > 0) {
+      const msg =
+        animalesSeleccionados.length > 1
+          ? `Evento registrado para ${exitosos} de ${animalesSeleccionados.length} animales.`
+          : 'El evento sanitario fue registrado correctamente.';
 
-      if (reminderEnabled && form.fechaProximoEvento) {
-        try {
-          await programarNotificacionEvento({
-            id: 0,
-            animalId: animalIdResolved,
-            tipoEvento: form.tipoEvento,
-            descripcion: form.descripcion.trim() || null,
-            fechaEvento: form.fechaEvento,
-            veterinario: form.veterinario.trim() || null,
-            dosis: form.dosis.trim() || null,
-            observaciones: form.observaciones.trim() || null,
-            fechaProximoEvento: form.fechaProximoEvento,
-          });
-        } catch {
-          // No bloqueamos el guardado si la notificacion no pudo programarse.
-        }
+      if (fallidos.length > 0) {
+        Alert.alert('Guardado con errores', `${msg}\nFallaron: ${fallidos.join(', ')}`, [
+          { text: 'OK', onPress: () => onBack() },
+        ]);
+      } else {
+        Alert.alert('Guardado', msg, [{ text: 'OK', onPress: () => onBack() }]);
       }
 
-      Alert.alert('Guardado', 'El evento sanitario fue registrado correctamente.');
-      setForm(prev => ({
-        ...INITIAL_FORM,
-        animalIdInput: animalId ? String(animalId) : prev.animalIdInput,
-      }));
-
-      if (animalIdResolved) {
-        await listar(animalIdResolved);
-        setListVisible(true);
-      }
-    } catch {
-      // El estado del hook ya refleja el error.
+      setForm(INITIAL_FORM);
+      setAnimalesSeleccionados(prev => (animalId ? prev.filter(a => a.id === animalId) : []));
+    } else if (fallidos.length > 0) {
+      Alert.alert('Error', `No se pudo registrar para: ${fallidos.join(', ')}`);
     }
   };
+
+  const isAnimalFijo = (id: number) => id === animalId;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -303,33 +367,82 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
 
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>Volver</Text>
+          <Text style={styles.backText}>← Volver</Text>
         </Pressable>
         <Text style={styles.title}>Registrar Evento Sanitario</Text>
         <Text style={styles.subtitle}>Vacunas, desparasitaciones y seguimiento clínico.</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {!animalId ? (
-          <View style={styles.card}>
-            <Text style={styles.label}>Arete</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+        {/* ── SELECTOR DE ANIMALES ── */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Animales a tratar</Text>
+
+          {/* Chips de animales seleccionados */}
+          {animalesSeleccionados.length > 0 && (
+            <View style={styles.animalChipsWrap}>
+              {animalesSeleccionados.map(a => (
+                <Pressable
+                  key={a.id}
+                  style={[styles.animalChip, isAnimalFijo(a.id) && styles.animalChipFijo]}
+                  onPress={() => removerAnimal(a.id)}
+                >
+                  <Text style={styles.animalChipText}>
+                    #{a.arete}{isAnimalFijo(a.id) ? ' 🔒' : ' ✕'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Input de búsqueda por arete */}
+          <Text style={styles.label}>
+            {animalesSeleccionados.length === 0 ? 'Buscar animal por arete *' : 'Agregar otro animal'}
+          </Text>
+          <View style={styles.searchRow}>
             <TextInput
-              value={form.animalIdInput}
-              onChangeText={value => setField('animalIdInput', value.replace(/\s/g, ''))}
-              placeholder="Ingresa el arete"
-              keyboardType="default"
-              onFocus={() => setFocusedField('animalIdInput')}
+              value={areteSearch}
+              onChangeText={handleAreteSearch}
+              placeholder="Ingresa el arete (ej: 1234567890)"
+              keyboardType="number-pad"
+              maxLength={10}
+              onFocus={() => setFocusedField('areteSearch')}
               onBlur={() => setFocusedField(null)}
               style={[
                 styles.input,
-                fieldErrors.animalIdInput ? styles.inputError : undefined,
-                focusedField === 'animalIdInput' && styles.inputFocused,
+                fieldErrors.animales ? styles.inputError : undefined,
+                focusedField === 'areteSearch' && styles.inputFocused,
+                { flex: 1 },
               ]}
             />
-            {fieldErrors.animalIdInput ? <Text style={styles.errorText}>{fieldErrors.animalIdInput}</Text> : null}
+            {buscando && <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 8 }} />}
           </View>
-        ) : null}
 
+          {/* Lista de sugerencias */}
+          {sugerencias.length > 0 && (
+            <View style={styles.sugerenciasBox}>
+              {sugerencias.map(s => (
+                <Pressable
+                  key={s.id}
+                  style={styles.sugerenciaItem}
+                  onPress={() => agregarAnimal(s)}
+                >
+                  <Text style={styles.sugerenciaArete}>#{s.arete}</Text>
+                  <Text style={styles.sugerenciaEspecie}>{s.especie}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {areteSearch.length >= 2 && sugerencias.length === 0 && !buscando && (
+            <Text style={styles.noResultsText}>No se encontraron animales activos con ese arete.</Text>
+          )}
+
+          {fieldErrors.animales ? <Text style={styles.errorText}>{fieldErrors.animales}</Text> : null}
+        </View>
+
+        {/* ── TIPO DE EVENTO ── */}
         <View style={styles.card}>
           <Text style={styles.label}>Tipo de evento</Text>
           <View style={styles.chipsRow}>
@@ -347,12 +460,11 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
             })}
           </View>
 
-          {/* Mostrar chips de subtipo si es VACUNA o DESPARASITACION */}
           {(form.tipoEvento === TipoEvento.VACUNA || form.tipoEvento === TipoEvento.DESPARASITACION) && (
             <View>
               <Text style={styles.label}>Subtipo</Text>
               <View style={styles.chipsRow}>
-                {SUBTIPOS_POR_TIPO[form.tipoEvento]?.map(sub => {
+                {(SUBTIPOS_POR_TIPO[form.tipoEvento] ?? []).map(sub => {
                   const selected = form.subtipo === sub;
                   return (
                     <Pressable
@@ -369,6 +481,7 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
           )}
         </View>
 
+        {/* ── DETALLES DEL EVENTO ── */}
         <View style={styles.card}>
           <Text style={styles.label}>Descripcion *</Text>
           <TextInput
@@ -396,12 +509,11 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
             style={[styles.input, focusedField === 'veterinario' && styles.inputFocused]}
           />
 
-          <Text style={styles.label}>Dosis</Text>
+          <Text style={styles.label}>Dosis (opcional)</Text>
           <TextInput
             value={form.dosis}
-            onChangeText={value => setField('dosis', value.replace(/\D/g, ''))}
-            placeholder="Ej. 5"
-            keyboardType="number-pad"
+            onChangeText={value => setField('dosis', value)}
+            placeholder="Ej. 5 ml"
             onFocus={() => setFocusedField('dosis')}
             onBlur={() => setFocusedField(null)}
             style={[styles.input, focusedField === 'dosis' && styles.inputFocused]}
@@ -419,8 +531,9 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
           />
         </View>
 
+        {/* ── FECHAS ── */}
         <View style={styles.card}>
-          <Text style={styles.label}>Fecha del evento</Text>
+          <Text style={styles.label}>Fecha del evento *</Text>
           <Pressable
             style={[
               styles.dateField,
@@ -430,13 +543,15 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
             onPress={() => openCalendar('fechaEvento')}
           >
             <Text style={[styles.dateText, !form.fechaEvento && styles.datePlaceholder]}>
-              {form.fechaEvento || 'Seleccionar fecha'}
+              {form.fechaEvento || 'Seleccionar fecha (pasada o hoy)'}
             </Text>
             <Text style={styles.dateIcon}>📅</Text>
           </Pressable>
           {fieldErrors.fechaEvento ? <Text style={styles.errorText}>{fieldErrors.fechaEvento}</Text> : null}
 
-          <Text style={styles.label}>Fecha proxima</Text>
+          <Text style={styles.label}>Fecha proxima *</Text>
+          <Text style={styles.labelHint}>Solo fechas actuales o futuras</Text>
+
           {form.fechaProximoEventoSugerida && !form.fechaProximoEvento && (
             <Pressable
               style={styles.suggestedDateButton}
@@ -446,6 +561,7 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
               <Text style={styles.suggestedDateValue}>{form.fechaProximoEventoSugerida}</Text>
             </Pressable>
           )}
+
           <Pressable
             style={[
               styles.dateField,
@@ -455,45 +571,50 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
             onPress={() => openCalendar('fechaProximoEvento')}
           >
             <Text style={[styles.dateText, !form.fechaProximoEvento && styles.datePlaceholder]}>
-              {form.fechaProximoEvento || 'Seleccionar fecha'}
+              {form.fechaProximoEvento || 'Seleccionar fecha futura'}
             </Text>
             <Text style={styles.dateIcon}>📅</Text>
           </Pressable>
-          {fieldErrors.fechaProximoEvento ? (
-            <Text style={styles.errorText}>{fieldErrors.fechaProximoEvento}</Text>
-          ) : null}
+          {fieldErrors.fechaProximoEvento ? <Text style={styles.errorText}>{fieldErrors.fechaProximoEvento}</Text> : null}
         </View>
 
+        {/* ── RECORDATORIO ── */}
         <View style={styles.reminderCard}>
           <View style={styles.reminderTextWrap}>
             <Text style={styles.reminderLabel}>Programar Recordatorio</Text>
             <Text style={styles.reminderHint}>(Al día de la próxima dosis)</Text>
           </View>
-          <View style={styles.reminderToggleWrap}>
-            <Switch
-              value={reminderEnabled}
-              onValueChange={setReminderEnabled}
-              trackColor={{ true: COLORS.primary, false: '#d0d0d0' }}
-              thumbColor="#ffffff"
-            />
-          </View>
+          <Switch
+            value={reminderEnabled}
+            onValueChange={setReminderEnabled}
+            trackColor={{ true: COLORS.primary, false: '#d0d0d0' }}
+            thumbColor="#ffffff"
+          />
         </View>
 
-        {error || fieldErrors.general ? (
-          <Text style={styles.errorBanner}>{error ?? fieldErrors.general}</Text>
-        ) : null}
+        {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
+        {/* ── BOTÓN GUARDAR ── */}
         <Pressable
           onPress={onSubmit}
           disabled={loading}
           style={({ pressed }) => [styles.saveButton, (pressed || loading) && styles.saveButtonPressed]}
         >
-          <Text style={styles.saveButtonText}>{loading ? 'Guardando...' : 'Guardar Evento Sanitario'}</Text>
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : (
+              <Text style={styles.saveButtonText}>
+                {animalesSeleccionados.length > 1
+                  ? `Guardar para ${animalesSeleccionados.length} animales`
+                  : 'Guardar Evento Sanitario'}
+              </Text>
+            )}
         </Pressable>
 
-        {listVisible && animalIdResolved ? (
+        {/* ── HISTORIAL DEL PRIMER ANIMAL ── */}
+        {listVisible && animalesSeleccionados[0] ? (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Eventos registrados</Text>
+            <Text style={styles.sectionTitle}>Eventos del animal #{animalesSeleccionados[0].arete}</Text>
             {eventos.length === 0 ? (
               <Text style={styles.emptyText}>Aun no hay eventos para este animal.</Text>
             ) : (
@@ -509,6 +630,7 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
         ) : null}
       </ScrollView>
 
+      {/* ── CALENDARIO ── */}
       <Modal visible={calendarTarget != null} transparent animationType="fade" onRequestClose={closeCalendar}>
         <View style={styles.modalBackdrop}>
           <View style={styles.calendarCard}>
@@ -536,28 +658,40 @@ export function RegistrarEventoSanitario({ onBack, animalId }: RegistrarEventoSa
 
             <View style={styles.weekRow}>
               {WEEKDAY_LABELS.map(day => (
-                <Text key={day} style={styles.weekDay}>
-                  {day}
-                </Text>
+                <Text key={day} style={styles.weekDay}>{day}</Text>
               ))}
             </View>
 
             <View style={styles.daysGrid}>
               {getMonthDays(calendarMonth).map((day, index) => {
-                if (!day) {
-                  return <View key={`empty-${index}`} style={styles.dayCell} />;
-                }
+                if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
 
-                const disableDay = calendarTarget === 'fechaEvento' && isFutureDate(day);
+                const disableDay =
+                  calendarTarget === 'fechaEvento'
+                    ? isFutureDate(day)
+                    : calendarTarget === 'fechaProximoEvento'
+                      ? isPastDate(day)
+                      : false;
+
+                const isSelected =
+                  calendarTarget === 'fechaEvento'
+                    ? form.fechaEvento === formatDate(day)
+                    : form.fechaProximoEvento === formatDate(day);
 
                 return (
                   <Pressable
                     key={day.toISOString()}
-                    style={[styles.dayCell, disableDay && styles.dayCellDisabled]}
+                    style={[
+                      styles.dayCell,
+                      isSelected && styles.dayCellSelected,
+                      disableDay && styles.dayCellDisabled,
+                    ]}
                     disabled={disableDay}
                     onPress={() => selectDate(day)}
                   >
-                    <Text style={styles.dayCellText}>{day.getDate()}</Text>
+                    <Text style={[styles.dayCellText, isSelected && styles.dayCellTextSelected]}>
+                      {day.getDate()}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -585,15 +719,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backButton: {
-    alignSelf: 'flex-start',
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 999,
   },
   backText: {
     color: COLORS.white,
-    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    fontFamily: FONTS.bold,
   },
   title: {
     marginTop: 14,
@@ -608,7 +742,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
     gap: 14,
   },
   card: {
@@ -621,10 +755,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
+  sectionTitle: {
+    color: COLORS.black,
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    marginBottom: 10,
+  },
   label: {
     marginBottom: 6,
+    marginTop: 10,
     color: COLORS.black,
     fontFamily: FONTS.semiBold,
+  },
+  labelHint: {
+    marginBottom: 6,
+    color: '#6c8060',
+    fontFamily: FONTS.regular,
+    fontSize: 12,
   },
   input: {
     borderWidth: 1,
@@ -640,10 +787,73 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: '#c84141',
   },
+  inputFocused: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sugerenciasBox: {
+    borderWidth: 1,
+    borderColor: '#d0dccf',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  sugerenciaItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef2ec',
+  },
+  sugerenciaArete: {
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+    fontSize: 14,
+  },
+  sugerenciaEspecie: {
+    fontFamily: FONTS.regular,
+    color: '#666',
+    fontSize: 12,
+  },
+  noResultsText: {
+    color: '#888',
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  animalChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  animalChip: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  animalChipFijo: {
+    backgroundColor: '#4a8f6a',
+  },
+  animalChipText: {
+    color: '#fff',
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    marginBottom: 6,
   },
   chip: {
     borderRadius: 999,
@@ -670,7 +880,7 @@ const styles = StyleSheet.create({
     borderColor: '#d9e1d8',
     borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: '#fbfcfa',
     flexDirection: 'row',
     alignItems: 'center',
@@ -704,7 +914,7 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 16,
-    paddingVertical: 15,
+    paddingVertical: 18,
     alignItems: 'center',
   },
   saveButtonPressed: {
@@ -714,12 +924,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontFamily: FONTS.bold,
     fontSize: 16,
-  },
-  sectionTitle: {
-    color: COLORS.black,
-    fontFamily: FONTS.bold,
-    fontSize: 16,
-    marginBottom: 10,
   },
   emptyText: {
     color: '#667066',
@@ -745,6 +949,47 @@ const styles = StyleSheet.create({
     color: '#6c7869',
     fontFamily: FONTS.semiBold,
     fontSize: 12,
+  },
+  reminderCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: '#e6efe6',
+  },
+  reminderTextWrap: {
+    flex: 1,
+  },
+  reminderLabel: {
+    color: COLORS.black,
+    fontFamily: FONTS.semiBold,
+  },
+  reminderHint: {
+    color: '#7a8b7a',
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+  },
+  suggestedDateButton: {
+    backgroundColor: '#f0f9f0',
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#c7e9c7',
+  },
+  suggestedDateLabel: {
+    color: '#555555',
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+  },
+  suggestedDateValue: {
+    color: COLORS.primary,
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    marginTop: 6,
   },
   modalBackdrop: {
     flex: 1,
@@ -810,6 +1055,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     borderRadius: 12,
   },
+  dayCellSelected: {
+    backgroundColor: COLORS.primary,
+  },
   dayCellDisabled: {
     opacity: 0.25,
   },
@@ -817,71 +1065,18 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontFamily: FONTS.semiBold,
   },
+  dayCellTextSelected: {
+    color: COLORS.white,
+  },
   calendarCloseButton: {
     marginTop: 14,
     borderRadius: 14,
     backgroundColor: COLORS.primary,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   calendarCloseText: {
     color: COLORS.white,
     fontFamily: FONTS.bold,
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.06,
-  },
-  reminderCard: {
-    marginTop: 6,
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: '#e6efe6',
-  },
-  reminderTextWrap: {
-    flex: 1,
-  },
-  reminderLabel: {
-    color: COLORS.black,
-    fontFamily: FONTS.semiBold,
-  },
-  reminderHint: {
-    color: '#7a8b7a',
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-  },
-  reminderToggleWrap: {
-    marginLeft: 12,
-  },
-  saveButtonFull: {
-    marginTop: 18,
-    paddingVertical: 16,
-    borderRadius: 999,
-  },
-  suggestedDateButton: {
-    backgroundColor: '#f0f9f0',
-    borderRadius: 10,
-    padding: 12,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#c7e9c7',
-  },
-  suggestedDateLabel: {
-    color: '#555555',
-    fontFamily: FONTS.semiBold,
-    fontSize: 12,
-  },
-  suggestedDateValue: {
-    color: COLORS.primary,
-    fontFamily: FONTS.bold,
-    fontSize: 16,
-    marginTop: 6,
   },
 });

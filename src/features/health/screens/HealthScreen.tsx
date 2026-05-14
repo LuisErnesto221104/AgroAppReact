@@ -132,7 +132,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Volver</Text>
+          <Text style={styles.backButtonText}>← Volver</Text>
         </Pressable>
         <Text style={styles.title}>Eventos Sanitarios</Text>
       </View>
@@ -202,7 +202,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
         </View>
       ) : filter === 'historial' ? (
         // Historial: agrupado por fechas, sin botones
-        <ScrollView style={[styles.listContainer, { paddingHorizontal: 12 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.listContainer, { paddingHorizontal: 12 }]} contentContainerStyle={{ paddingBottom: 160 }} showsVerticalScrollIndicator={false}>
           {Object.entries(groupedByDate).map(([date, eventos]) => (
             <View key={date}>
               <Text style={styles.dateGroupTitle}>{date}</Text>
@@ -221,7 +221,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
         </ScrollView>
       ) : (
         // Pendientes y Vacunas: con botones
-        <ScrollView style={[styles.listContainer, { paddingHorizontal: 12 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.listContainer, { paddingHorizontal: 12 }]} contentContainerStyle={{ paddingBottom: 160 }} showsVerticalScrollIndicator={false}>
           {filteredEvents.map((item: any) => {
             const fechaProx = item.fechaProximoEvento ? new Date(item.fechaProximoEvento + 'T00:00:00') : null;
             const isVencido = fechaProx ? fechaProx.getTime() < today.getTime() : false;
@@ -322,15 +322,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   backButton: {
-    paddingHorizontal: 10,
     paddingVertical: 6,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 999,
   },
   backButtonText: {
     color: '#ffffff',
-    fontFamily: FONTS.semiBold,
-    fontSize: 11,
+    fontSize: 14,
+    fontFamily: FONTS.bold,
   },
   title: {
     color: '#ffffff',
@@ -452,13 +452,14 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 18,
-    bottom: 28,
+    bottom: 84,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 6,
   },
   fabText: {
     color: '#fff',

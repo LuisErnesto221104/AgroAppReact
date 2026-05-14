@@ -6,6 +6,7 @@ import { RegistrarAnimalScreen } from '../screens/animales/RegistrarAnimalScreen
 import { AnimalModel } from '../types/Animal';
 import { DetalleAnimalScreen } from '../screens/animales/DetalleAnimalScreen';
 import HistorialClinico from '../features/animals/screens/HistorialClinico';
+import { RegistrarEventoSanitario } from '../screens/sanitarios/RegistrarEventoSanitario';
 
 type AnimalesNavigatorProps = {
   onBack: () => void;

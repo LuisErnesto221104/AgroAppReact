@@ -10,14 +10,19 @@ type AnimalSearchBarProps = {
 export function AnimalSearchBar({ value, onSearch, placeholder = 'Buscar por arete...' }: AnimalSearchBarProps) {
   const showClear = value.trim().length > 0;
 
+  const handleChange = (text: string) => {
+    onSearch(text.replace(/\D/g, ''));
+  };
+
   return (
     <View style={styles.container}>
       <TextInput
         value={value}
-        onChangeText={onSearch}
+        onChangeText={handleChange}
         style={styles.input}
         placeholder={placeholder}
         placeholderTextColor="#859383"
+        keyboardType="number-pad"
         autoCapitalize="none"
         autoCorrect={false}
       />

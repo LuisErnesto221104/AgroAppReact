@@ -167,12 +167,13 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
   }
 
   const eventosRecientes = historial.eventos_recientes.slice(0, 2);
+  const isBlocked = currentAnimal.estado === 'VENDIDO' || currentAnimal.estado === 'FALLECIDO';
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
+          <Text style={styles.backText}>← Volver</Text>
         </Pressable>
 
         <View style={styles.headerTextBlock}>
@@ -279,15 +280,24 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
       </ScrollView>
 
       <View style={styles.actionBar}>
-        <Pressable style={styles.outlineButton} onPress={() => onEdit(currentAnimal)}>
-          <Text style={styles.outlineButtonText}>✏️ Editar Datos del Animal</Text>
+        <Pressable
+          style={[styles.outlineButton, isBlocked && styles.actionButtonDisabled]}
+          onPress={() => !isBlocked && onEdit(currentAnimal)}
+          disabled={isBlocked}
+        >
+          <Text style={[styles.outlineButtonText, isBlocked && styles.actionButtonDisabledText]}>
+            ✏️ Editar Datos del Animal
+          </Text>
         </Pressable>
 
         <Pressable
-          style={styles.primaryButton}
-          onPress={() => setShowRegistrarEvento(true)}
+          style={[styles.primaryButton, isBlocked && styles.actionButtonDisabled]}
+          onPress={() => !isBlocked && setShowRegistrarEvento(true)}
+          disabled={isBlocked}
         >
-          <Text style={styles.primaryButtonText}>Registrar Nuevo Evento</Text>
+          <Text style={[styles.primaryButtonText, isBlocked && styles.actionButtonDisabledText]}>
+            Registrar Nuevo Evento
+          </Text>
         </Pressable>
       </View>
 
@@ -372,15 +382,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   backText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
   },
   headerTextBlock: {
@@ -409,7 +418,7 @@ const styles = StyleSheet.create({
   },
   body: {
     padding: 12,
-    paddingBottom: 140,
+    paddingBottom: 200,
   },
   summaryCard: {
     backgroundColor: '#f0f0f0',
@@ -511,7 +520,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    bottom: 12,
+    bottom: 76,
     gap: 8,
   },
   outlineButton: {
@@ -603,6 +612,14 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  actionButtonDisabled: {
+    opacity: 0.35,
+    borderColor: '#aaaaaa',
+    backgroundColor: '#cccccc',
+  },
+  actionButtonDisabledText: {
+    color: '#666666',
   },
   centerState: {
     flex: 1,

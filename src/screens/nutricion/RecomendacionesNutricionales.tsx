@@ -71,7 +71,7 @@ export function RecomendacionesNutricionales({ onBack }: RecomendacionesNutricio
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Volver</Text>
+          <Text style={styles.backBtnText}>← Volver</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Nutrición Animal</Text>
         <Pressable onPress={onSharePress} style={styles.shareBtn}>
@@ -156,15 +156,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   backBtn: {
-    paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 999,
   },
   backBtnText: {
-    color: 'white',
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+    fontSize: 14,
+    fontFamily: 'Poppins-Bold',
   },
   headerTitle: {
     flex: 1,

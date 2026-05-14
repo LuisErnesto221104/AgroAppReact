@@ -16,7 +16,7 @@ import java.util.Set;
 public class DatabaseHelper extends SQLiteOpenHelper {
     
     private static final String DATABASE_NAME = "AgroApp.db";
-    private static final int DATABASE_VERSION = 11; // Sprint 4 — RF003: sistema de costos
+    private static final int DATABASE_VERSION = 12; // Sprint 4 fix: tabla gastos correcta en fresh install
     
     // Tabla Usuarios
     public static final String TABLE_USUARIOS = "usuarios";
@@ -217,18 +217,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
         db.execSQL(createHistorial);
         
-        // Crear tabla Gastos
+        // Crear tabla Gastos (estructura v11+)
         String createGastos = "CREATE TABLE " + TABLE_GASTOS + " (" +
                 COL_GASTO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COL_GASTO_ANIMAL_ID + " INTEGER, " +
-                COL_GASTO_RAZA + " TEXT, " +
-                COL_GASTO_TIPO + " TEXT, " +
-                COL_GASTO_CONCEPTO + " TEXT, " +
-                COL_GASTO_MONTO + " REAL, " +
-                COL_GASTO_FECHA + " TEXT, " +
-                COL_GASTO_OBSERVACIONES + " TEXT, " +
-                "FOREIGN KEY(" + COL_GASTO_ANIMAL_ID + ") REFERENCES " + 
-                TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE CASCADE)";
+                COL_GASTO_CATEGORIA + " TEXT NOT NULL CHECK(" + COL_GASTO_CATEGORIA +
+                " IN ('ALIMENTACION','MEDICAMENTOS','TRASLADO','VETERINARIO','OTRO')), " +
+                COL_GASTO_DESCRIPCION + " TEXT NOT NULL, " +
+                COL_GASTO_MONTO + " REAL NOT NULL CHECK(" + COL_GASTO_MONTO + " >= 0), " +
+                COL_GASTO_FECHA + " TEXT NOT NULL, " +
+                COL_GASTO_NOTAS + " TEXT, " +
+                "FOREIGN KEY(" + COL_GASTO_ANIMAL_ID + ") REFERENCES " +
+                TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE SET NULL)";
         db.execSQL(createGastos);
         
         // Crear tabla Alimentación
@@ -318,6 +318,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         if (oldVersion < 11) {
             // Sprint 4 — RF003: mejorar sistema de costos
             migracionGastosV11(db);
+        }
+        if (oldVersion < 12) {
+            // Corregir tabla gastos si la migración V11 falló silenciosamente
+            migracionGastosV12(db);
         }
     }
     
@@ -494,6 +498,53 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             
         } catch (Exception e) {
             // Si la migración falla (tabla ya migrada), ignorar
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Migración v12: Asegura que la tabla gastos tenga la estructura correcta.
+     * Repara instalaciones donde V11 falló silenciosamente.
+     */
+    private void migracionGastosV12(SQLiteDatabase db) {
+        try {
+            // Verificar si la columna 'categoria' existe en gastos
+            boolean hasCategoria = false;
+            android.database.Cursor pragma = db.rawQuery("PRAGMA table_info(" + TABLE_GASTOS + ")", null);
+            if (pragma != null) {
+                try {
+                    int nameIdx = pragma.getColumnIndex("name");
+                    while (pragma.moveToNext()) {
+                        if ("categoria".equals(pragma.getString(nameIdx))) {
+                            hasCategoria = true;
+                            break;
+                        }
+                    }
+                } finally {
+                    pragma.close();
+                }
+            }
+
+            // Limpiar tabla _new residual de una migración V11 fallida
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_GASTOS + "_new");
+
+            if (!hasCategoria) {
+                // La tabla tiene estructura vieja — reemplazarla
+                // (los datos existentes no son útiles porque los inserts fallaban)
+                db.execSQL("DROP TABLE IF EXISTS " + TABLE_GASTOS);
+                db.execSQL("CREATE TABLE " + TABLE_GASTOS + " (" +
+                        COL_GASTO_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        COL_GASTO_ANIMAL_ID + " INTEGER, " +
+                        COL_GASTO_CATEGORIA + " TEXT NOT NULL CHECK(" + COL_GASTO_CATEGORIA +
+                        " IN ('ALIMENTACION','MEDICAMENTOS','TRASLADO','VETERINARIO','OTRO')), " +
+                        COL_GASTO_DESCRIPCION + " TEXT NOT NULL, " +
+                        COL_GASTO_MONTO + " REAL NOT NULL CHECK(" + COL_GASTO_MONTO + " >= 0), " +
+                        COL_GASTO_FECHA + " TEXT NOT NULL, " +
+                        COL_GASTO_NOTAS + " TEXT, " +
+                        "FOREIGN KEY(" + COL_GASTO_ANIMAL_ID + ") REFERENCES " +
+                        TABLE_ANIMALES + "(" + COL_ANIMAL_ID + ") ON DELETE SET NULL)");
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

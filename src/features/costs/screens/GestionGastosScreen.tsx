@@ -11,7 +11,12 @@ import {
 import { NativeModules } from 'react-native';
 import { GastoModel, CATEGORIA_GASTO_LABELS, CATEGORIA_COLORES } from '../../../types/Costos';
 
-const { AgroBridgeModule } = NativeModules;
+const { AgroBridgeModule, AnimalModule } = NativeModules;
+
+interface AnimalRef {
+  id: number;
+  arete: string;
+}
 
 interface GestionGastosScreenProps {
   onBack: () => void;
@@ -25,12 +30,30 @@ export function GestionGastosScreen({
   onEditGasto,
 }: GestionGastosScreenProps) {
   const [gastos, setGastos] = useState<GastoModel[]>([]);
+  const [animales, setAnimales] = useState<AnimalRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    cargarGastos();
+    void cargarAnimales();
+    void cargarGastos();
   }, []);
+
+  const cargarAnimales = async () => {
+    try {
+      const resultado = await AnimalModule.listAnimals();
+      if (resultado && Array.isArray(resultado)) {
+        setAnimales(resultado.map((a: any) => ({ id: a.id, arete: a.arete })));
+      }
+    } catch {
+      // Si falla, simplemente mostramos el ID
+    }
+  };
+
+  const getAreteAnimal = (animalId: number | null | undefined): string | null => {
+    if (!animalId || animalId <= 0) return null;
+    return animales.find(a => a.id === animalId)?.arete ?? null;
+  };
 
   const cargarGastos = async () => {
     try {
@@ -49,7 +72,7 @@ export function GestionGastosScreen({
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await cargarGastos();
+    await Promise.all([cargarGastos(), cargarAnimales()]);
     setRefreshing(false);
   };
 
@@ -97,9 +120,9 @@ export function GestionGastosScreen({
             {item.descripcion}
           </Text>
           {item.animalId && item.animalId > 0 && (
-            <Text style={styles.animal}>🐄 Animal ID: {item.animalId}</Text>
+            <Text style={styles.animal}>🐄 Arete: {getAreteAnimal(item.animalId) ?? `#${item.animalId}`}</Text>
           )}
-          {!item.animalId && (
+          {(!item.animalId || item.animalId <= 0) && (
             <Text style={styles.animal}>📋 Gasto General</Text>
           )}
           <Text style={styles.fecha}>{item.fecha}</Text>
@@ -146,8 +169,8 @@ export function GestionGastosScreen({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Text style={styles.backButton}>← Atrás</Text>
+        <TouchableOpacity onPress={onBack} style={styles.backButtonWrap}>
+          <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Gestión de Gastos</Text>
       </View>
@@ -225,11 +248,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  backButton: {
-    fontSize: 16,
+  backButtonWrap: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#e8f5ec',
+    marginRight: 12,
+  },
+  backButtonText: {
+    fontSize: 14,
     color: '#07612d',
     fontFamily: 'Poppins-SemiBold',
-    marginRight: 12,
+    fontWeight: '700',
   },
   title: {
     fontSize: 20,
@@ -267,7 +297,8 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 160,
   },
   gastoCard: {
     backgroundColor: 'white',
@@ -350,30 +381,30 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     backgroundColor: '#3B82F6',
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
   editButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
     color: 'white',
   },
   deleteButton: {
     flex: 1,
     backgroundColor: '#EF4444',
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
   deleteButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
     color: 'white',
   },
   fab: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 84,
     right: 24,
     width: 56,
     height: 56,

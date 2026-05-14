@@ -16,7 +16,7 @@ import { AnimalModule } from '../../native/AnimalModule';
 import type { AnimalFormState, InsertAnimalPayload } from '../../types/Animal';
 import { validateArete } from '../../utils/validaciones/areteValidator';
 
-const ESPECIES_OPTIONS = [
+const ESPECIES_BASE = [
   'Holstein',
   'Suizo Pardo',
   'Jersey',
@@ -58,7 +58,7 @@ type RegistrarAnimalScreenProps = {
 
 const INITIAL_FORM_STATE: AnimalFormState = {
   arete: '',
-  especie: ESPECIES_OPTIONS[0],
+  especie: ESPECIES_BASE[0],
   sexo: SEXO_OPTIONS[0].value,
   fecha: '',
   peso: '',
@@ -246,12 +246,12 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>Volver</Text>
+          <Text style={styles.backText}>← Volver</Text>
         </Pressable>
         <Text style={styles.title}>Registrar Animal</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Numero de Arete SINIIGA *</Text>
         <TextInput
           value={form.arete}
@@ -265,7 +265,7 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
 
         <Text style={styles.label}>Especie / Raza</Text>
         <View style={styles.chipWrap}>
-          {ESPECIES_OPTIONS.map(option => {
+          {ESPECIES_BASE.map(option => {
             const selected = form.especie === option;
             return (
               <Pressable
@@ -277,7 +277,29 @@ export function RegistrarAnimalScreen({ onBack, onSuccess }: RegistrarAnimalScre
               </Pressable>
             );
           })}
+          {/* Opción Otro */}
+          <Pressable
+            key="Otro"
+            style={[styles.chip, !ESPECIES_BASE.includes(form.especie) && styles.chipSelected]}
+            onPress={() => {
+              if (ESPECIES_BASE.includes(form.especie)) {
+                setField('especie', '');
+              }
+            }}
+          >
+            <Text style={[styles.chipText, !ESPECIES_BASE.includes(form.especie) && styles.chipTextSelected]}>Otro</Text>
+          </Pressable>
         </View>
+        {!ESPECIES_BASE.includes(form.especie) && (
+          <TextInput
+            value={form.especie}
+            onChangeText={value => setField('especie', value)}
+            placeholder="Escribe la raza..."
+            style={[styles.input, { marginTop: 8 }]}
+            maxLength={50}
+            autoFocus={form.especie === ''}
+          />
+        )}
 
         <Text style={styles.label}>Sexo</Text>
         <View style={styles.chipWrap}>
@@ -432,14 +454,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#2f5d3a',
   },
   backButton: {
-    alignSelf: 'flex-start',
     paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: '#e8edd8',
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   backText: {
-    color: '#2f5d3a',
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '700',
   },
   title: {
@@ -450,7 +472,7 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 16,
-    paddingBottom: 28,
+    paddingBottom: 90,
   },
   label: {
     marginBottom: 6,

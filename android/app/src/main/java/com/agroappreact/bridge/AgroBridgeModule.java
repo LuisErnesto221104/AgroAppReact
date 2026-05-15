@@ -422,6 +422,21 @@ public class AgroBridgeModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void eliminarEventoSanitario(double idDouble, Promise promise) {
+        try {
+            int id = (int) idDouble;
+            if (id <= 0) {
+                promise.reject("ERR_ELIMINAR_EVENTO", "ID de evento inválido.");
+                return;
+            }
+            boolean eliminado = eventoSanitarioDAO.eliminarEvento(id);
+            promise.resolve(eliminado);
+        } catch (Exception e) {
+            promise.reject("ERR_ELIMINAR_EVENTO", e.getMessage());
+        }
+    }
+
+    @ReactMethod
     public void calcularProximaFechaNOM(String tipoEvento, String subtipo, String fechaEvento, Promise promise) {
         try {
             String proximaFecha = SanitarioCicloNOM041.calcularProximaFecha(tipoEvento, subtipo, fechaEvento);

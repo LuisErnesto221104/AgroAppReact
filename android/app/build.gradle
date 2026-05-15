@@ -94,6 +94,19 @@ android {
             keyPassword 'android'
         }
     }
+    packaging {
+        resources {
+            excludes += [
+                'META-INF/BCKEY.DSA',
+                'META-INF/BCKEY.SF',
+                'META-INF/LICENSE.md',
+                'META-INF/NOTICE.md',
+                'META-INF/LICENSE',
+                'META-INF/NOTICE',
+            ]
+        }
+    }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -112,6 +125,11 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     implementation("androidx.work:work-runtime:2.9.0")
+
+    // iText7 Community — PDF generation (offline, no red)
+    implementation("com.itextpdf:kernel:7.1.16")
+    implementation("com.itextpdf:io:7.1.16")
+    implementation("com.itextpdf:layout:7.1.16")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

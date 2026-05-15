@@ -1,10 +1,10 @@
 # Script para generar markdown de src/ para Sprint 3
-$commits = @("4d8ba67", "ed0ea71", "f66f4b0", "b03211b", "3098f5c", "064281f", "23802bc", "b6e35be")
+$commits = @("4d8ba67", "ed0ea71", "f66f4b0", "b03211b", "3098f5c", "064281f", "23802bc", "b6e35be", "f6abc6d")
 $outPath = "docs/src-contenido-Sprint3-4d8ba67-a-b6e35be.md"
 
 # Header
 $md = @()
-$md += "# Archivos de src - Sprint 3 (4d8ba67 a b6e35be)"
+$md += "# Archivos de src - Sprint 3 (4d8ba67 a f6abc6d)"
 $md += ""
 $md += "## Commits incluidos:"
 foreach ($c in $commits) {
@@ -30,6 +30,17 @@ $md += "**Total archivos únicos en src:** $($uniqueFiles.Count)"
 $md += ""
 $md += "---"
 $md += ""
+
+$md += "## Ajustes incorporados en f6abc6d"
+$md += ""
+$md += "- src/components/animales/AnimalSearchBar.tsx: refinamiento del buscador de arete y limpieza visual del campo."
+$md += "- src/features/animals/screens/HistorialClinico.tsx: ajuste del flujo de historial para alinearlo con la nueva navegacion de animales."
+$md += "- src/features/costs/screens/GestionGastosScreen.tsx y src/features/costs/screens/RegistrarGastoScreen.tsx: mejoras en gestion y captura de gastos."
+$md += "- src/features/health/screens/HealthScreen.tsx: integracion del flujo de eventos sanitarios con recomendaciones nutricionales."
+$md += "- src/screens/animales/DetalleAnimalScreen.tsx, src/screens/animales/EditarAnimalScreen.tsx, src/screens/animales/ListadoAnimalesScreen.tsx y src/screens/animales/RegistrarAnimalScreen.tsx: ajustes del ciclo de vida del animal y validaciones asociadas."
+$md += "- src/screens/sanitarios/RegistrarEventoSanitario.tsx: refactor principal del sprint, con seleccion multiple de animales, validacion de fechas y sugerencia de proxima fecha."
+$md += ""
+$md += "---"
 
 # Para cada archivo
 foreach ($file in $uniqueFiles) {

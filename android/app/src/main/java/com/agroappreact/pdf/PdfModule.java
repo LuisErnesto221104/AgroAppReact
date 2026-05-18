@@ -212,6 +212,408 @@ public class PdfModule extends ReactContextBaseJavaModule {
         });
     }
 
+    @ReactMethod
+    public void generateAnimalPdf(double animalIdDouble, Promise promise) {
+        executor.execute(() -> {
+            try {
+                int animalId = (int) animalIdDouble;
+                ReactApplicationContext context = getReactApplicationContext();
+                SQLiteDatabase db = DatabaseHelper.getInstance(context).getReadableDatabase();
+
+                // 1. SELECT * FROM animales WHERE id = animalId
+                Cursor cAnimal = db.rawQuery(
+                    "SELECT numero_arete, especie, sexo, raza, estado, peso_actual, fecha_ingreso " +
+                    "FROM animales WHERE id = ?",
+                    new String[]{String.valueOf(animalId)}
+                );
+                if (cAnimal == null || !cAnimal.moveToFirst()) {
+                    if (cAnimal != null) cAnimal.close();
+                    promise.reject("PDF_ERROR", "Animal no encontrado con id: " + animalId);
+                    return;
+                }
+
+                String arete        = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("numero_arete")));
+                String especie      = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("especie")));
+                String sexo         = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("sexo")));
+                String raza         = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("raza")));
+                String estado       = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("estado")));
+                int    idxPeso      = cAnimal.getColumnIndexOrThrow("peso_actual");
+                double pesoActual   = cAnimal.isNull(idxPeso) ? 0.0 : cAnimal.getDouble(idxPeso);
+                String fechaIngreso = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("fecha_ingreso")));
+                cAnimal.close();
+
+                // 2. SELECT … FROM eventos_sanitarios WHERE animal_id=? ORDER BY fecha_evento DESC
+                Cursor cEventos = db.rawQuery(
+                    "SELECT tipo_evento, descripcion, fecha_evento, veterinario, observaciones " +
+                    "FROM eventos_sanitarios WHERE animal_id = ? ORDER BY fecha_evento DESC",
+                    new String[]{String.valueOf(animalId)}
+                );
+
+                // 3. SELECT … FROM gastos WHERE animal_id=? ORDER BY fecha DESC  +  SUM(monto)
+                Cursor cGastos = db.rawQuery(
+                    "SELECT categoria, descripcion, monto, fecha " +
+                    "FROM gastos WHERE animal_id = ? ORDER BY fecha DESC",
+                    new String[]{String.valueOf(animalId)}
+                );
+                double totalGastos = 0.0;
+                Cursor cTotal = db.rawQuery(
+                    "SELECT SUM(monto) FROM gastos WHERE animal_id = ?",
+                    new String[]{String.valueOf(animalId)}
+                );
+                if (cTotal != null) {
+                    try {
+                        if (cTotal.moveToFirst() && !cTotal.isNull(0)) {
+                            totalGastos = cTotal.getDouble(0);
+                        }
+                    } finally {
+                        cTotal.close();
+                    }
+                }
+
+                // Directorio y nombre de archivo
+                File docsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
+                if (docsDir == null) docsDir = context.getFilesDir();
+                File agroDir = new File(docsDir, "AgroApp");
+                if (!agroDir.exists() && !agroDir.mkdirs()) {
+                    promise.reject("PDF_ERROR", "No se pudo crear el directorio de destino.");
+                    return;
+                }
+                String fechaNombre  = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+                String areteSafe    = arete.replaceAll("[^a-zA-Z0-9]", "_");
+                File pdfFile        = new File(agroDir, "animal_" + areteSafe + "_" + fechaNombre + ".pdf");
+
+                // 4. Documento iText7
+                PdfWriter   writer  = new PdfWriter(pdfFile.getAbsolutePath());
+                PdfDocument pdfDoc  = new PdfDocument(writer);
+                Document    document = new Document(pdfDoc, PageSize.A4);
+                document.setMargins(36, 36, 36, 36);
+
+                DeviceRgb green      = new DeviceRgb(7,   97,  45);   // #07612d
+                DeviceRgb white      = new DeviceRgb(255, 255, 255);
+                DeviceRgb rowAlt     = new DeviceRgb(244, 248, 240);   // #f4f8f0
+                DeviceRgb grayText   = new DeviceRgb(100, 100, 100);
+                DeviceRgb footerGray = new DeviceRgb(150, 150, 150);
+                DeviceRgb totalBg    = new DeviceRgb(232, 245, 236);   // #e8f5ec
+
+                String ahora = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US).format(new Date());
+
+                document.add(new Paragraph("AgroApp — Ficha del Animal")
+                    .setFontSize(18).setBold().setFontColor(green).setTextAlignment(TextAlignment.CENTER));
+                document.add(new Paragraph("Arete: " + arete + "  |  Generado: " + ahora)
+                    .setFontSize(10).setFontColor(grayText)
+                    .setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
+
+                // ── SECCIÓN 1: Datos del Animal ───────────────────────────
+                addSectionTitle(document, "Datos del Animal", green, white);
+
+                Table dataTable = new Table(UnitValue.createPercentArray(new float[]{3f, 5f}))
+                    .setWidth(UnitValue.createPercentValue(100));
+                String[][] campos = {
+                    {"Arete",          arete},
+                    {"Especie",        especie},
+                    {"Sexo",           sexo},
+                    {"Raza",           raza},
+                    {"Estado",         estado},
+                    {"Peso actual",    String.format(Locale.US, "%.2f kg", pesoActual)},
+                    {"Fecha de ingreso", fechaIngreso},
+                };
+                for (int i = 0; i < campos.length; i++) {
+                    DeviceRgb bg = (i % 2 == 0) ? white : rowAlt;
+                    dataTable.addCell(new Cell()
+                        .add(new Paragraph(campos[i][0]).setBold().setFontSize(10))
+                        .setBackgroundColor(bg).setPadding(6));
+                    dataTable.addCell(new Cell()
+                        .add(new Paragraph(campos[i][1]).setFontSize(10))
+                        .setBackgroundColor(bg).setPadding(6));
+                }
+                document.add(dataTable);
+                document.add(new Paragraph(" "));
+
+                // ── SECCIÓN 2: Historial Clínico ──────────────────────────
+                addSectionTitle(document, "Historial Clinico", green, white);
+
+                if (cEventos == null || cEventos.getCount() == 0) {
+                    document.add(new Paragraph("Sin eventos clinicos registrados.")
+                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
+                } else {
+                    float[] evCols = {2f, 2f, 4f, 2.5f, 3.5f};
+                    Table evTable = new Table(UnitValue.createPercentArray(evCols))
+                        .setWidth(UnitValue.createPercentValue(100));
+                    for (String h : new String[]{"Fecha", "Tipo", "Descripcion", "Veterinario", "Observaciones"}) {
+                        evTable.addHeaderCell(new Cell()
+                            .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
+                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
+                    }
+                    int rowNum = 0;
+                    while (cEventos.moveToNext()) {
+                        DeviceRgb bg = (rowNum % 2 == 0) ? white : rowAlt;
+                        String[] vals = {
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("fecha_evento"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("tipo_evento"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("descripcion"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("veterinario"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("observaciones"))),
+                        };
+                        for (String v : vals) {
+                            evTable.addCell(new Cell()
+                                .add(new Paragraph(v).setFontSize(8))
+                                .setBackgroundColor(bg).setPadding(4));
+                        }
+                        rowNum++;
+                    }
+                    document.add(evTable);
+                    document.add(new Paragraph(" "));
+                }
+                if (cEventos != null) cEventos.close();
+
+                // ── SECCIÓN 3: Resumen de Gastos ──────────────────────────
+                addSectionTitle(document, "Resumen de Gastos", green, white);
+
+                if (cGastos == null || cGastos.getCount() == 0) {
+                    document.add(new Paragraph("Sin gastos registrados.")
+                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
+                } else {
+                    float[] gCols = {2.5f, 4f, 2f, 2f};
+                    Table gTable = new Table(UnitValue.createPercentArray(gCols))
+                        .setWidth(UnitValue.createPercentValue(100));
+                    for (String h : new String[]{"Categoria", "Descripcion", "Monto MXN", "Fecha"}) {
+                        gTable.addHeaderCell(new Cell()
+                            .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
+                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
+                    }
+                    int rowNum = 0;
+                    while (cGastos.moveToNext()) {
+                        DeviceRgb bg    = (rowNum % 2 == 0) ? white : rowAlt;
+                        String    cat   = safe(cGastos.getString(cGastos.getColumnIndexOrThrow("categoria")));
+                        String    desc  = safe(cGastos.getString(cGastos.getColumnIndexOrThrow("descripcion")));
+                        int       idxM  = cGastos.getColumnIndexOrThrow("monto");
+                        double    monto = cGastos.isNull(idxM) ? 0.0 : cGastos.getDouble(idxM);
+                        String    fecha = safe(cGastos.getString(cGastos.getColumnIndexOrThrow("fecha")));
+
+                        String[]        vals   = {cat, desc, String.format(Locale.US, "$%.2f", monto), fecha};
+                        TextAlignment[] aligns = {
+                            TextAlignment.LEFT, TextAlignment.LEFT,
+                            TextAlignment.RIGHT, TextAlignment.CENTER
+                        };
+                        for (int c = 0; c < vals.length; c++) {
+                            gTable.addCell(new Cell()
+                                .add(new Paragraph(vals[c]).setFontSize(8))
+                                .setBackgroundColor(bg).setTextAlignment(aligns[c]).setPadding(4));
+                        }
+                        rowNum++;
+                    }
+                    // Fila de total en negrita
+                    gTable.addCell(new Cell(1, 3)
+                        .add(new Paragraph("Inversion Total").setBold().setFontSize(10))
+                        .setBackgroundColor(totalBg).setPadding(7));
+                    gTable.addCell(new Cell()
+                        .add(new Paragraph(String.format(Locale.US, "$%,.2f MXN", totalGastos))
+                            .setBold().setFontSize(10))
+                        .setBackgroundColor(totalBg).setTextAlignment(TextAlignment.RIGHT).setPadding(7));
+                    document.add(gTable);
+                }
+                if (cGastos != null) cGastos.close();
+
+                // Footer
+                document.add(new Paragraph("\nAgroApp v1.0 — Offline-First — com.agroappreact")
+                    .setFontSize(8).setFontColor(footerGray)
+                    .setTextAlignment(TextAlignment.CENTER).setMarginTop(28));
+
+                document.close();
+
+                // 6. Retornar ruta absoluta
+                promise.resolve(pdfFile.getAbsolutePath());
+
+            } catch (Exception e) {
+                promise.reject("PDF_ERROR", e.getMessage(), e);
+            }
+        });
+    }
+
+    @ReactMethod
+    public void generateHistorialPdf(double animalIdDouble, Promise promise) {
+        executor.execute(() -> {
+            try {
+                int animalId = (int) animalIdDouble;
+                ReactApplicationContext context = getReactApplicationContext();
+                SQLiteDatabase db = DatabaseHelper.getInstance(context).getReadableDatabase();
+
+                // 1. Datos básicos del animal
+                Cursor cAnimal = db.rawQuery(
+                    "SELECT numero_arete, especie, estado " +
+                    "FROM animales WHERE id = ?",
+                    new String[]{String.valueOf(animalId)}
+                );
+                if (cAnimal == null || !cAnimal.moveToFirst()) {
+                    if (cAnimal != null) cAnimal.close();
+                    promise.reject("PDF_ERROR", "Animal no encontrado con id: " + animalId);
+                    return;
+                }
+                String arete   = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("numero_arete")));
+                String especie = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("especie")));
+                String estado  = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("estado")));
+                cAnimal.close();
+
+                // 2. Todos los eventos sanitarios del animal (cronológico DESC)
+                Cursor cEventos = db.rawQuery(
+                    "SELECT tipo_evento, descripcion, fecha_evento, " +
+                    "       veterinario, dosis, observaciones, fecha_proximo_evento " +
+                    "FROM eventos_sanitarios " +
+                    "WHERE animal_id = ? ORDER BY fecha_evento DESC",
+                    new String[]{String.valueOf(animalId)}
+                );
+
+                // 3. Historial clínico complementario
+                Cursor cHistorial = db.rawQuery(
+                    "SELECT fecha, enfermedad, sintomas, tratamiento, observaciones " +
+                    "FROM historial_clinico " +
+                    "WHERE animal_id = ? ORDER BY fecha DESC",
+                    new String[]{String.valueOf(animalId)}
+                );
+
+                // Directorio y nombre de archivo
+                File docsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
+                if (docsDir == null) docsDir = context.getFilesDir();
+                File agroDir = new File(docsDir, "AgroApp");
+                if (!agroDir.exists() && !agroDir.mkdirs()) {
+                    promise.reject("PDF_ERROR", "No se pudo crear el directorio de destino.");
+                    return;
+                }
+                String fechaNombre = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+                String areteSafe   = arete.replaceAll("[^a-zA-Z0-9]", "_");
+                File pdfFile       = new File(agroDir, "historial_" + areteSafe + "_" + fechaNombre + ".pdf");
+
+                // 4. Documento iText7
+                PdfWriter   writer   = new PdfWriter(pdfFile.getAbsolutePath());
+                PdfDocument pdfDoc   = new PdfDocument(writer);
+                Document    document = new Document(pdfDoc, PageSize.A4);
+                document.setMargins(36, 36, 36, 36);
+
+                DeviceRgb green      = new DeviceRgb(7,   97,  45);
+                DeviceRgb white      = new DeviceRgb(255, 255, 255);
+                DeviceRgb rowAlt     = new DeviceRgb(244, 248, 240);
+                DeviceRgb grayText   = new DeviceRgb(100, 100, 100);
+                DeviceRgb footerGray = new DeviceRgb(150, 150, 150);
+
+                String ahora = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US).format(new Date());
+
+                // Encabezado del documento
+                document.add(new Paragraph("AgroApp — Historial Clínico")
+                    .setFontSize(18).setBold().setFontColor(green)
+                    .setTextAlignment(TextAlignment.CENTER));
+                document.add(new Paragraph(
+                    "Arete: " + arete + "  |  Especie: " + especie +
+                    "  |  Estado: " + estado + "  |  Generado: " + ahora)
+                    .setFontSize(10).setFontColor(grayText)
+                    .setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
+
+                // ── SECCIÓN 1: Eventos Sanitarios ─────────────────────────
+                addSectionTitle(document, "Eventos Sanitarios", green, white);
+
+                int totalEventos = (cEventos != null) ? cEventos.getCount() : 0;
+                if (totalEventos == 0) {
+                    document.add(new Paragraph("Sin eventos sanitarios registrados.")
+                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
+                } else {
+                    // Resumen numérico por tipo
+                    document.add(new Paragraph("Total de eventos: " + totalEventos)
+                        .setFontSize(10).setFontColor(grayText).setMarginTop(4).setMarginBottom(8));
+
+                    float[] evCols = {2f, 2f, 3.5f, 2f, 1.5f, 3f};
+                    Table evTable = new Table(UnitValue.createPercentArray(evCols))
+                        .setWidth(UnitValue.createPercentValue(100));
+                    for (String h : new String[]{"Fecha", "Tipo", "Descripcion", "Veterinario", "Dosis", "Observaciones"}) {
+                        evTable.addHeaderCell(new Cell()
+                            .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
+                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
+                    }
+                    int rowNum = 0;
+                    while (cEventos.moveToNext()) {
+                        DeviceRgb bg = (rowNum % 2 == 0) ? white : rowAlt;
+                        String[] vals = {
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("fecha_evento"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("tipo_evento"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("descripcion"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("veterinario"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("dosis"))),
+                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("observaciones"))),
+                        };
+                        for (String v : vals) {
+                            evTable.addCell(new Cell()
+                                .add(new Paragraph(v).setFontSize(8))
+                                .setBackgroundColor(bg).setPadding(4));
+                        }
+                        rowNum++;
+                    }
+                    document.add(evTable);
+                    document.add(new Paragraph(" "));
+                }
+                if (cEventos != null) cEventos.close();
+
+                // ── SECCIÓN 2: Historial Clínico ──────────────────────────
+                addSectionTitle(document, "Enfermedades y Tratamientos", green, white);
+
+                int totalHistorial = (cHistorial != null) ? cHistorial.getCount() : 0;
+                if (totalHistorial == 0) {
+                    document.add(new Paragraph("Sin registros de enfermedades o tratamientos.")
+                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
+                } else {
+                    float[] hCols = {2f, 3f, 3f, 3f, 3f};
+                    Table hTable = new Table(UnitValue.createPercentArray(hCols))
+                        .setWidth(UnitValue.createPercentValue(100));
+                    for (String h : new String[]{"Fecha", "Enfermedad", "Síntomas", "Tratamiento", "Observaciones"}) {
+                        hTable.addHeaderCell(new Cell()
+                            .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
+                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
+                    }
+                    int rowNum = 0;
+                    while (cHistorial.moveToNext()) {
+                        DeviceRgb bg = (rowNum % 2 == 0) ? white : rowAlt;
+                        String[] vals = {
+                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("fecha"))),
+                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("enfermedad"))),
+                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("sintomas"))),
+                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("tratamiento"))),
+                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("observaciones"))),
+                        };
+                        for (String v : vals) {
+                            hTable.addCell(new Cell()
+                                .add(new Paragraph(v).setFontSize(8))
+                                .setBackgroundColor(bg).setPadding(4));
+                        }
+                        rowNum++;
+                    }
+                    document.add(hTable);
+                }
+                if (cHistorial != null) cHistorial.close();
+
+                // Footer
+                document.add(new Paragraph("\nAgroApp v1.0 — Offline-First — com.agroappreact")
+                    .setFontSize(8).setFontColor(footerGray)
+                    .setTextAlignment(TextAlignment.CENTER).setMarginTop(28));
+
+                document.close();
+                promise.resolve(pdfFile.getAbsolutePath());
+
+            } catch (Exception e) {
+                promise.reject("PDF_ERROR", e.getMessage(), e);
+            }
+        });
+    }
+
+    private void addSectionTitle(Document doc, String title,
+                                 DeviceRgb bgColor, DeviceRgb textColor) {
+        doc.add(new Paragraph(title)
+            .setBold()
+            .setFontSize(11)
+            .setFontColor(textColor)
+            .setBackgroundColor(bgColor)
+            .setPaddingLeft(10)
+            .setPaddingTop(6)
+            .setPaddingBottom(6)
+            .setMarginBottom(0));
+    }
+
     private String safe(String value) {
         return (value != null && !value.isEmpty()) ? value : "—";
     }

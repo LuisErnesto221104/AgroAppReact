@@ -54,9 +54,10 @@ type DetalleAnimalScreenProps = {
   onEdit: (animal: AnimalModel) => void;
   onDeleted: () => void;
   onOpenHistorial?: (animalId: number) => void;
+  onOpenReporteAnimal?: (animalId: number, arete: string) => void;
 };
 
-export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, onDeleted, onOpenHistorial }: DetalleAnimalScreenProps) {
+export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, onDeleted, onOpenHistorial, onOpenReporteAnimal }: DetalleAnimalScreenProps) {
   const [currentAnimal, setCurrentAnimal] = useState<AnimalModel | null>(null);
   const [historial, setHistorial] = useState<HistorialResumen>({
     historial_peso: [],
@@ -281,24 +282,35 @@ export function DetalleAnimalScreen({ animalId, refreshToken, onBack, onEdit, on
 
       <View style={styles.actionBar}>
         <Pressable
-          style={[styles.outlineButton, isBlocked && styles.actionButtonDisabled]}
-          onPress={() => !isBlocked && onEdit(currentAnimal)}
-          disabled={isBlocked}
+          style={styles.pdfButton}
+          onPress={() => onOpenReporteAnimal
+            ? onOpenReporteAnimal(animalId, currentAnimal.arete)
+            : undefined}
         >
-          <Text style={[styles.outlineButtonText, isBlocked && styles.actionButtonDisabledText]}>
-            ✏️ Editar Datos del Animal
-          </Text>
+          <Text style={styles.pdfButtonText}>📊 Ver Reporte PDF</Text>
         </Pressable>
 
-        <Pressable
-          style={[styles.primaryButton, isBlocked && styles.actionButtonDisabled]}
-          onPress={() => !isBlocked && setShowRegistrarEvento(true)}
-          disabled={isBlocked}
-        >
-          <Text style={[styles.primaryButtonText, isBlocked && styles.actionButtonDisabledText]}>
-            Registrar Nuevo Evento
-          </Text>
-        </Pressable>
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.outlineButton, isBlocked && styles.actionButtonDisabled]}
+            onPress={() => !isBlocked && onEdit(currentAnimal)}
+            disabled={isBlocked}
+          >
+            <Text style={[styles.outlineButtonText, isBlocked && styles.actionButtonDisabledText]}>
+              ✏️ Editar
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.primaryButton, isBlocked && styles.actionButtonDisabled]}
+            onPress={() => !isBlocked && setShowRegistrarEvento(true)}
+            disabled={isBlocked}
+          >
+            <Text style={[styles.primaryButtonText, isBlocked && styles.actionButtonDisabledText]}>
+              + Registrar Evento
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <Modal
@@ -418,7 +430,7 @@ const styles = StyleSheet.create({
   },
   body: {
     padding: 12,
-    paddingBottom: 200,
+    paddingBottom: 260,
   },
   summaryCard: {
     backgroundColor: '#f0f0f0',
@@ -523,7 +535,25 @@ const styles = StyleSheet.create({
     bottom: 76,
     gap: 8,
   },
+  pdfButton: {
+    borderRadius: 10,
+    backgroundColor: '#e8f5ec',
+    borderWidth: 1,
+    borderColor: '#0a6b33',
+    alignItems: 'center',
+    paddingVertical: 11,
+  },
+  pdfButtonText: {
+    color: '#0a6b33',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   outlineButton: {
+    flex: 1,
     borderWidth: 2,
     borderColor: '#0a6b33',
     borderRadius: 10,
@@ -536,6 +566,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   primaryButton: {
+    flex: 1,
     borderRadius: 10,
     backgroundColor: '#0a6b33',
     alignItems: 'center',

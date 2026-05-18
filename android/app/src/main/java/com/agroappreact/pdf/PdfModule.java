@@ -438,10 +438,9 @@ public class PdfModule extends ReactContextBaseJavaModule {
                 ReactApplicationContext context = getReactApplicationContext();
                 SQLiteDatabase db = DatabaseHelper.getInstance(context).getReadableDatabase();
 
-                // 1. Datos básicos del animal
+                // 1. SELECT numero_arete, especie FROM animales WHERE id = animalId
                 Cursor cAnimal = db.rawQuery(
-                    "SELECT numero_arete, especie, estado " +
-                    "FROM animales WHERE id = ?",
+                    "SELECT numero_arete, especie FROM animales WHERE id = ?",
                     new String[]{String.valueOf(animalId)}
                 );
                 if (cAnimal == null || !cAnimal.moveToFirst()) {
@@ -451,23 +450,14 @@ public class PdfModule extends ReactContextBaseJavaModule {
                 }
                 String arete   = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("numero_arete")));
                 String especie = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("especie")));
-                String estado  = safe(cAnimal.getString(cAnimal.getColumnIndexOrThrow("estado")));
                 cAnimal.close();
 
-                // 2. Todos los eventos sanitarios del animal (cronológico DESC)
+                // 2. SELECT … FROM eventos_sanitarios WHERE animal_id=? ORDER BY fecha_evento DESC
                 Cursor cEventos = db.rawQuery(
                     "SELECT tipo_evento, descripcion, fecha_evento, " +
-                    "       veterinario, dosis, observaciones, fecha_proximo_evento " +
+                    "       veterinario, dosis, observaciones " +
                     "FROM eventos_sanitarios " +
                     "WHERE animal_id = ? ORDER BY fecha_evento DESC",
-                    new String[]{String.valueOf(animalId)}
-                );
-
-                // 3. Historial clínico complementario
-                Cursor cHistorial = db.rawQuery(
-                    "SELECT fecha, enfermedad, sintomas, tratamiento, observaciones " +
-                    "FROM historial_clinico " +
-                    "WHERE animal_id = ? ORDER BY fecha DESC",
                     new String[]{String.valueOf(animalId)}
                 );
 
@@ -476,123 +466,94 @@ public class PdfModule extends ReactContextBaseJavaModule {
                 if (docsDir == null) docsDir = context.getFilesDir();
                 File agroDir = new File(docsDir, "AgroApp");
                 if (!agroDir.exists() && !agroDir.mkdirs()) {
+                    if (cEventos != null) cEventos.close();
                     promise.reject("PDF_ERROR", "No se pudo crear el directorio de destino.");
                     return;
                 }
+                // 4. Guardar: Documents/AgroApp/historial_[arete]_yyyyMMdd.pdf
                 String fechaNombre = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
                 String areteSafe   = arete.replaceAll("[^a-zA-Z0-9]", "_");
                 File pdfFile       = new File(agroDir, "historial_" + areteSafe + "_" + fechaNombre + ".pdf");
 
-                // 4. Documento iText7
+                // 3. PDF iText7
                 PdfWriter   writer   = new PdfWriter(pdfFile.getAbsolutePath());
                 PdfDocument pdfDoc   = new PdfDocument(writer);
                 Document    document = new Document(pdfDoc, PageSize.A4);
                 document.setMargins(36, 36, 36, 36);
 
-                DeviceRgb green      = new DeviceRgb(7,   97,  45);
+                DeviceRgb green      = new DeviceRgb(7,   97,  45);   // #07612d
                 DeviceRgb white      = new DeviceRgb(255, 255, 255);
-                DeviceRgb rowAlt     = new DeviceRgb(244, 248, 240);
+                DeviceRgb rowAlt     = new DeviceRgb(244, 248, 240);   // #f4f8f0
                 DeviceRgb grayText   = new DeviceRgb(100, 100, 100);
                 DeviceRgb footerGray = new DeviceRgb(150, 150, 150);
 
-                String ahora = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US).format(new Date());
+                String fechaCorta = new SimpleDateFormat("dd/MM/yyyy", Locale.US).format(new Date());
 
-                // Encabezado del documento
-                document.add(new Paragraph("AgroApp — Historial Clínico")
+                // Título: 'Historial Clinico — Arete [numero_arete]'
+                document.add(new Paragraph("Historial Clinico — Arete " + arete)
                     .setFontSize(18).setBold().setFontColor(green)
                     .setTextAlignment(TextAlignment.CENTER));
-                document.add(new Paragraph(
-                    "Arete: " + arete + "  |  Especie: " + especie +
-                    "  |  Estado: " + estado + "  |  Generado: " + ahora)
+
+                // Subtítulo: 'Especie: [especie] | Generado: dd/MM/yyyy'
+                document.add(new Paragraph("Especie: " + especie + "  |  Generado: " + fechaCorta)
                     .setFontSize(10).setFontColor(grayText)
                     .setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
 
-                // ── SECCIÓN 1: Eventos Sanitarios ─────────────────────────
-                addSectionTitle(document, "Eventos Sanitarios", green, white);
-
-                int totalEventos = (cEventos != null) ? cEventos.getCount() : 0;
-                if (totalEventos == 0) {
-                    document.add(new Paragraph("Sin eventos sanitarios registrados.")
-                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
+                // Tabla: Fecha | Tipo Evento | Descripcion | Veterinario | Observaciones
+                if (cEventos == null || cEventos.getCount() == 0) {
+                    document.add(new Paragraph("Sin eventos clinicos registrados para este animal.")
+                        .setFontSize(11).setFontColor(grayText)
+                        .setTextAlignment(TextAlignment.CENTER).setMarginTop(40));
                 } else {
-                    // Resumen numérico por tipo
-                    document.add(new Paragraph("Total de eventos: " + totalEventos)
-                        .setFontSize(10).setFontColor(grayText).setMarginTop(4).setMarginBottom(8));
-
-                    float[] evCols = {2f, 2f, 3.5f, 2f, 1.5f, 3f};
-                    Table evTable = new Table(UnitValue.createPercentArray(evCols))
+                    float[] cols = {2f, 2f, 3.5f, 2.5f, 4f};
+                    Table table = new Table(UnitValue.createPercentArray(cols))
                         .setWidth(UnitValue.createPercentValue(100));
-                    for (String h : new String[]{"Fecha", "Tipo", "Descripcion", "Veterinario", "Dosis", "Observaciones"}) {
-                        evTable.addHeaderCell(new Cell()
+
+                    for (String h : new String[]{"Fecha", "Tipo Evento", "Descripcion", "Veterinario", "Observaciones"}) {
+                        table.addHeaderCell(new Cell()
                             .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
-                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
+                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(6));
                     }
+
+                    int idxFecha = cEventos.getColumnIndexOrThrow("fecha_evento");
+                    int idxTipo  = cEventos.getColumnIndexOrThrow("tipo_evento");
+                    int idxDesc  = cEventos.getColumnIndexOrThrow("descripcion");
+                    int idxVet   = cEventos.getColumnIndexOrThrow("veterinario");
+                    int idxObs   = cEventos.getColumnIndexOrThrow("observaciones");
+
                     int rowNum = 0;
                     while (cEventos.moveToNext()) {
                         DeviceRgb bg = (rowNum % 2 == 0) ? white : rowAlt;
                         String[] vals = {
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("fecha_evento"))),
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("tipo_evento"))),
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("descripcion"))),
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("veterinario"))),
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("dosis"))),
-                            safe(cEventos.getString(cEventos.getColumnIndexOrThrow("observaciones"))),
+                            safe(cEventos.getString(idxFecha)),
+                            safe(cEventos.getString(idxTipo)),
+                            safe(cEventos.getString(idxDesc)),
+                            safe(cEventos.getString(idxVet)),
+                            safe(cEventos.getString(idxObs)),
                         };
-                        for (String v : vals) {
-                            evTable.addCell(new Cell()
-                                .add(new Paragraph(v).setFontSize(8))
-                                .setBackgroundColor(bg).setPadding(4));
+                        TextAlignment[] aligns = {
+                            TextAlignment.CENTER, TextAlignment.LEFT,
+                            TextAlignment.LEFT,   TextAlignment.LEFT, TextAlignment.LEFT
+                        };
+                        for (int c = 0; c < vals.length; c++) {
+                            table.addCell(new Cell()
+                                .add(new Paragraph(vals[c]).setFontSize(8))
+                                .setBackgroundColor(bg).setTextAlignment(aligns[c]).setPadding(5));
                         }
                         rowNum++;
                     }
-                    document.add(evTable);
-                    document.add(new Paragraph(" "));
+                    document.add(table);
                 }
                 if (cEventos != null) cEventos.close();
 
-                // ── SECCIÓN 2: Historial Clínico ──────────────────────────
-                addSectionTitle(document, "Enfermedades y Tratamientos", green, white);
-
-                int totalHistorial = (cHistorial != null) ? cHistorial.getCount() : 0;
-                if (totalHistorial == 0) {
-                    document.add(new Paragraph("Sin registros de enfermedades o tratamientos.")
-                        .setFontSize(10).setFontColor(grayText).setMarginTop(6).setMarginBottom(12));
-                } else {
-                    float[] hCols = {2f, 3f, 3f, 3f, 3f};
-                    Table hTable = new Table(UnitValue.createPercentArray(hCols))
-                        .setWidth(UnitValue.createPercentValue(100));
-                    for (String h : new String[]{"Fecha", "Enfermedad", "Síntomas", "Tratamiento", "Observaciones"}) {
-                        hTable.addHeaderCell(new Cell()
-                            .add(new Paragraph(h).setBold().setFontColor(white).setFontSize(9))
-                            .setBackgroundColor(green).setTextAlignment(TextAlignment.CENTER).setPadding(5));
-                    }
-                    int rowNum = 0;
-                    while (cHistorial.moveToNext()) {
-                        DeviceRgb bg = (rowNum % 2 == 0) ? white : rowAlt;
-                        String[] vals = {
-                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("fecha"))),
-                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("enfermedad"))),
-                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("sintomas"))),
-                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("tratamiento"))),
-                            safe(cHistorial.getString(cHistorial.getColumnIndexOrThrow("observaciones"))),
-                        };
-                        for (String v : vals) {
-                            hTable.addCell(new Cell()
-                                .add(new Paragraph(v).setFontSize(8))
-                                .setBackgroundColor(bg).setPadding(4));
-                        }
-                        rowNum++;
-                    }
-                    document.add(hTable);
-                }
-                if (cHistorial != null) cHistorial.close();
-
-                // Footer
-                document.add(new Paragraph("\nAgroApp v1.0 — Offline-First — com.agroappreact")
+                // Footer: 'AgroApp v1.0 — com.agroappreact'
+                document.add(new Paragraph("\nAgroApp v1.0 — com.agroappreact")
                     .setFontSize(8).setFontColor(footerGray)
                     .setTextAlignment(TextAlignment.CENTER).setMarginTop(28));
 
                 document.close();
+
+                // 5. promise.resolve(rutaAbsoluta)
                 promise.resolve(pdfFile.getAbsolutePath());
 
             } catch (Exception e) {

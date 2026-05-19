@@ -5,7 +5,7 @@ import CalendarioSanitario from '../../../screens/sanitarios/CalendarioSanitario
 import { RegistrarEventoSanitario } from '../../../screens/sanitarios/RegistrarEventoSanitario';
 import { NotificationsScreen } from '../../../features/notifications/screens/NotificationsScreen';
 import { RecomendacionesNutricionales } from '../../../screens/nutricion/RecomendacionesNutricionales';
-import { obtenerEventosMes } from '../../../native/BridgeModule';
+import { obtenerEventosMes, eliminarEventoSanitario } from '../../../native/BridgeModule';
 import { EventoSanitarioItem } from '../../../components/animales/EventoSanitarioItem';
 import { EventoDetailModal } from '../../../components/EventoDetailModal';
 import { COLORS, FONTS } from '../../../shared/theme/identity';
@@ -18,6 +18,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
   const [view, setView] = useState<'lista' | 'registro' | 'nutricion'>('lista');
   const [eventsList, setEventsList] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [filter, setFilter] = useState<'pendientes' | 'historial' | 'vacunas'>('pendientes');
   const [selectedAnimalForRegister, setSelectedAnimalForRegister] = useState<number | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -28,6 +29,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
 
   const loadEvents = async (year?: number, month?: number) => {
     setEventsLoading(true);
+    setCargando(true);
     try {
       const y = year ?? new Date().getFullYear();
       const m = month ?? new Date().getMonth() + 1;
@@ -48,6 +50,7 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
       setEventsList([]);
     } finally {
       setEventsLoading(false);
+      setCargando(false);
     }
   };
 
@@ -300,8 +303,20 @@ export function HealthScreen({ onBack }: HealthScreenProps) {
           setSelectedAnimalForRegister(e.animalId ?? null);
           setView('registro');
         }}
+        onDelete={async (e) => {
+          try {
+            await eliminarEventoSanitario(e.id);
+          } catch (_) {
+            // silenciar error puntual; la lista se recarga de igual forma
+          } finally {
+            setDetailEvento(null);
+            void loadEvents();
+          }
+        }}
         arete={detailEvento ? (detailEvento.arete || areteMap[detailEvento.animalId] || String(detailEvento.animalId)) : undefined}
       />
+
+      {cargando && <ActivityIndicator size="large" color="#07612d" style={styles.loader} />}
     </View>
   );
 }
@@ -491,5 +506,12 @@ const styles = StyleSheet.create({
   closeModalBtnText: {
     color: '#fff',
     fontSize: 20,
+  },
+  loader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });

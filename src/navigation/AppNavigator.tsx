@@ -8,7 +8,7 @@ import { HealthScreen } from '../features/health/screens/HealthScreen';
 import { HomeModuleRoute } from '../features/home/types/homeNavigation';
 import { HomeScreen } from '../features/home/screens/HomeScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
-import { ReportsScreen } from '../features/reports/screens/ReportsScreen';
+import { ReportesMenuScreen } from '../features/reports/screens/ReportesMenuScreen';
 import { SplashScreen } from '../features/startup/screens/SplashScreen';
 import {
   clearSession,
@@ -248,7 +248,7 @@ export default function AppNavigator() {
 
   if (route === 'reports') {
     return wrapProtectedScreen(
-      <ReportsScreen onBack={() => navigate('home')} />
+      <ReportesMenuScreen onBack={() => navigate('home')} />
     );
   }
 

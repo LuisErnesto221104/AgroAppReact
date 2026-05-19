@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, StyleSheet, View } from 'react-native';
+import { AppState, AppStateStatus, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimalsScreen } from '../features/animals/screens/AnimalsScreen';
 import { CostsScreen } from '../features/costs/screens/CostsScreen';
@@ -17,9 +18,96 @@ import {
   SESSION_TIMEOUT_MS,
   validateSessionOnForeground,
 } from '../shared/services/sessionManager';
+import { COLORS, FONTS } from '../shared/theme/identity';
 import AuthFlow from '../screens/auth/AuthFlow';
 
 type AppRoute = 'startup' | 'auth' | 'home' | HomeModuleRoute;
+
+const NAV_TABS: { key: AppRoute; icon: string; label: string }[] = [
+  { key: 'home', icon: '🏠', label: 'Inicio' },
+  { key: 'animals', icon: '🐄', label: 'Animales' },
+  { key: 'health', icon: '💉', label: 'Sanitario' },
+  { key: 'costs', icon: '💵', label: 'Gastos' },
+  { key: 'reports', icon: '📊', label: 'Reportes' },
+];
+
+function BottomNavBar({
+  currentRoute,
+  onNavigate,
+}: {
+  currentRoute: AppRoute;
+  onNavigate: (r: AppRoute) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[navStyles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      {NAV_TABS.map(tab => {
+        const active = currentRoute === tab.key;
+        return (
+          <Pressable
+            key={tab.key}
+            style={navStyles.tabItem}
+            onPress={() => onNavigate(tab.key)}
+          >
+            <Text style={[navStyles.tabIcon, active && navStyles.tabIconActive]}>
+              {tab.icon}
+            </Text>
+            <Text style={[navStyles.tabLabel, active && navStyles.tabLabelActive]}>
+              {tab.label}
+            </Text>
+            {active && <View style={navStyles.activeIndicator} />}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const navStyles = StyleSheet.create({
+  bar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    borderTopWidth: 1,
+    borderTopColor: '#e3e3e3',
+    backgroundColor: '#ffffff',
+    paddingTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  tabItem: {
+    alignItems: 'center',
+    gap: 2,
+    flex: 1,
+    position: 'relative',
+  },
+  tabIcon: {
+    fontSize: 17,
+    opacity: 0.45,
+  },
+  tabIconActive: {
+    opacity: 1,
+  },
+  tabLabel: {
+    fontSize: 10,
+    color: '#999',
+    fontFamily: FONTS.semiBold,
+  },
+  tabLabelActive: {
+    color: COLORS.primary,
+    fontFamily: FONTS.bold,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: -8,
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
+  },
+});
 
 export default function AppNavigator() {
   const [route, setRoute] = useState<AppRoute>('startup');
@@ -36,9 +124,7 @@ export default function AppNavigator() {
   const expireSession = useCallback(() => {
     clearInactivityTimer();
     clearSession('timeout')
-      .catch(() => {
-        // Si falla escritura local, forzamos lock de UI de todas maneras.
-      })
+      .catch(() => {})
       .finally(() => setRoute('auth'));
   }, [clearInactivityTimer]);
 
@@ -47,7 +133,6 @@ export default function AppNavigator() {
       clearInactivityTimer();
       return;
     }
-
     clearInactivityTimer();
     inactivityTimerRef.current = setTimeout(() => {
       expireSession();
@@ -60,28 +145,16 @@ export default function AppNavigator() {
 
   useEffect(() => {
     let mounted = true;
-
-    // Primero mostramos splash de arranque y luego resolvemos sesion.
     const timer = setTimeout(() => {
       resolveStartupSession()
         .then(hasSession => {
-          if (!mounted) {
-            return;
-          }
-
-          if (hasSession) {
-            setRoute('home');
-            return;
-          }
-          setRoute('auth');
+          if (!mounted) return;
+          setRoute(hasSession ? 'home' : 'auth');
         })
         .catch(() => {
-          if (mounted) {
-            setRoute('auth');
-          }
+          if (mounted) setRoute('auth');
         });
     }, 1800);
-
     return () => {
       mounted = false;
       clearTimeout(timer);
@@ -93,26 +166,20 @@ export default function AppNavigator() {
       startInactivityTimer();
       return;
     }
-
     clearInactivityTimer();
   }, [clearInactivityTimer, protectedRoute, startInactivityTimer]);
 
   useEffect(() => {
-    return () => {
-      clearInactivityTimer();
-    };
+    return () => { clearInactivityTimer(); };
   }, [clearInactivityTimer]);
 
   useEffect(() => {
     const onAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'inactive' || nextState === 'background') {
         clearInactivityTimer();
-        markAppBackgrounded().catch(() => {
-          // No bloqueamos UX por fallas de almacenamiento local.
-        });
+        markAppBackgrounded().catch(() => {});
         return;
       }
-
       if (nextState === 'active') {
         validateSessionOnForeground()
           .then(isSessionActive => {
@@ -120,44 +187,35 @@ export default function AppNavigator() {
               setRoute('auth');
               return;
             }
-
             startInactivityTimer();
           })
-          .catch(() => {
-            setRoute('auth');
-          });
+          .catch(() => { setRoute('auth'); });
       }
     };
-
     const subscription = AppState.addEventListener('change', onAppStateChange);
     return () => subscription.remove();
   }, [clearInactivityTimer, startInactivityTimer]);
 
-  const wrapProtectedScreen = (screen: React.ReactNode) => {
-    if (!protectedRoute) {
-      return screen;
-    }
+  const navigate = useCallback((target: AppRoute) => {
+    registerActivity();
+    setRoute(target);
+  }, [registerActivity]);
 
+  const wrapProtectedScreen = (screen: React.ReactNode) => {
+    if (!protectedRoute) return screen;
     return (
       <View
         style={styles.protectedContainer}
-        onStartShouldSetResponderCapture={() => {
-          registerActivity();
-          return false;
-        }}
-        onMoveShouldSetResponderCapture={() => {
-          registerActivity();
-          return false;
-        }}
+        onStartShouldSetResponderCapture={() => { registerActivity(); return false; }}
+        onMoveShouldSetResponderCapture={() => { registerActivity(); return false; }}
       >
         {screen}
+        <BottomNavBar currentRoute={route} onNavigate={navigate} />
       </View>
     );
   };
 
-  if (route === 'startup') {
-    return <SplashScreen />;
-  }
+  if (route === 'startup') return <SplashScreen />;
 
   if (route === 'auth') {
     return (
@@ -171,26 +229,38 @@ export default function AppNavigator() {
   }
 
   if (route === 'animals') {
-    return wrapProtectedScreen(<AnimalsScreen onBack={() => setRoute('home')} />);
+    return wrapProtectedScreen(
+      <AnimalsScreen onBack={() => navigate('home')} />
+    );
   }
 
   if (route === 'health') {
-    return wrapProtectedScreen(<HealthScreen onBack={() => setRoute('home')} />);
+    return wrapProtectedScreen(
+      <HealthScreen onBack={() => navigate('home')} />
+    );
   }
 
   if (route === 'costs') {
-    return wrapProtectedScreen(<CostsScreen onBack={() => setRoute('home')} />);
+    return wrapProtectedScreen(
+      <CostsScreen onBack={() => navigate('home')} />
+    );
   }
 
   if (route === 'reports') {
-    return wrapProtectedScreen(<ReportsScreen onBack={() => setRoute('home')} />);
+    return wrapProtectedScreen(
+      <ReportsScreen onBack={() => navigate('home')} />
+    );
   }
 
   if (route === 'notifications') {
-    return wrapProtectedScreen(<NotificationsScreen onBack={() => setRoute('home')} />);
+    return wrapProtectedScreen(
+      <NotificationsScreen onBack={() => navigate('home')} />
+    );
   }
 
-  return wrapProtectedScreen(<HomeScreen onOpenModule={target => setRoute(target)} />);
+  return wrapProtectedScreen(
+    <HomeScreen onOpenModule={target => navigate(target)} />
+  );
 }
 
 const styles = StyleSheet.create({

@@ -20,7 +20,7 @@ export default function HistorialClinico({ route, navigation }: Props) {
       <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backTxt}>←</Text>
+          <Text style={styles.backTxt}>← Volver</Text>
         </Pressable>
         <Text style={styles.title}>Historial Clínico</Text>
       </View>
@@ -38,7 +38,7 @@ export default function HistorialClinico({ route, navigation }: Props) {
           onEndReachedThreshold={0.5}
           refreshing={loading}
           onRefresh={recargar}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
         />
       )}
 
@@ -70,21 +70,28 @@ export default function HistorialClinico({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f4f4f4' },
   header: { backgroundColor: COLORS.primary, padding: 12, flexDirection: 'row', alignItems: 'center' },
-  backBtn: { marginRight: 12 },
-  backTxt: { color: '#fff', fontFamily: FONTS.bold },
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginRight: 8,
+  },
+  backTxt: { color: '#fff', fontSize: 14, fontFamily: FONTS.bold },
   title: { color: '#fff', fontSize: 18, fontFamily: FONTS.bold },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#888', fontFamily: FONTS.regular },
   fab: {
     position: 'absolute',
     right: 18,
-    bottom: 28,
+    bottom: 84,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 6,
   },
   fabText: { color: '#fff', fontSize: 24, fontFamily: FONTS.bold },
 });

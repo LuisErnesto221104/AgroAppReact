@@ -16,7 +16,7 @@ import { VentaAnimalModal } from '../../components/animales/VentaAnimalModal';
 import { AnimalModule } from '../../native/AnimalModule';
 import { AnimalModel, UpdateAnimalPayload } from '../../types/Animal';
 
-const ESPECIES_OPTIONS = [
+const ESPECIES_BASE = [
   'Holstein',
   'Suizo Pardo',
   'Jersey',
@@ -35,18 +35,8 @@ const SEXO_OPTIONS = [
 ];
 
 const MONTH_NAMES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 const WEEKDAY_LABELS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
@@ -70,21 +60,19 @@ type EditFormState = {
 };
 
 export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScreenProps) {
+  // Derivados de estado original — inmutables durante la sesión
+  const isVendido = animal.estado === 'VENDIDO';
+  const isFallecidoOriginal = animal.estado === 'FALLECIDO';
+
   const normalizeSexo = (sexo: string | null | undefined) => {
-    if (sexo === 'F') {
-      return 'H';
-    }
+    if (sexo === 'F') return 'H';
     return sexo ?? 'M';
   };
 
   const initialPhotoUri = useMemo(() => {
     const raw = animal.foto?.trim();
-    if (!raw) {
-      return null;
-    }
-    if (raw.startsWith('file://') || raw.startsWith('content://') || raw.startsWith('http')) {
-      return raw;
-    }
+    if (!raw) return null;
+    if (raw.startsWith('file://') || raw.startsWith('content://') || raw.startsWith('http')) return raw;
     return `file://${raw}`;
   }, [animal.foto]);
 
@@ -107,29 +95,25 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     return form.fecha ? new Date(`${form.fecha}T00:00:00`) : new Date();
   });
 
+  // Determina si la especie actual es "Otro" (no está en la lista base)
+  const isOtroSelected = !ESPECIES_BASE.includes(form.especie);
+
   const canSubmit = useMemo(() => {
+    if (isVendido) return false;
     return form.especie.trim().length > 0 && form.sexo.trim().length > 0 && form.fecha.trim().length > 0;
-  }, [form]);
+  }, [form, isVendido]);
 
   useEffect(() => {
-    if (form.estado !== 'FALLECIDO') {
-      return;
-    }
+    if (form.estado !== 'FALLECIDO') return;
 
     setForm(prev => {
       const today = formatDate(new Date());
       const nextFechaBaja = prev.fechaBaja.trim().length > 0 ? prev.fechaBaja : today;
       const nextMotivoBaja = prev.motivoBaja.trim().length > 0 ? prev.motivoBaja : 'Cambio de estado registrado desde editar';
 
-      if (nextFechaBaja === prev.fechaBaja && nextMotivoBaja === prev.motivoBaja) {
-        return prev;
-      }
+      if (nextFechaBaja === prev.fechaBaja && nextMotivoBaja === prev.motivoBaja) return prev;
 
-      return {
-        ...prev,
-        fechaBaja: nextFechaBaja,
-        motivoBaja: nextMotivoBaja,
-      };
+      return { ...prev, fechaBaja: nextFechaBaja, motivoBaja: nextMotivoBaja };
     });
   }, [form.estado]);
 
@@ -154,9 +138,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     return candidate.getTime() > today.getTime();
   };
 
-  const parseCalendarDate = (year: number, month: number, day: number) => {
-    return new Date(year, month, day);
-  };
+  const parseCalendarDate = (year: number, month: number, day: number) => new Date(year, month, day);
 
   const getMonthDays = (baseDate: Date) => {
     const year = baseDate.getFullYear();
@@ -165,29 +147,25 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells: Array<Date | null> = [];
 
-    for (let i = 0; i < firstDay; i += 1) {
-      cells.push(null);
-    }
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      cells.push(parseCalendarDate(year, month, day));
-    }
+    for (let i = 0; i < firstDay; i += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) cells.push(parseCalendarDate(year, month, day));
 
     return cells;
   };
 
   const openCalendar = () => {
+    if (isVendido) return;
     setCalendarMonth(form.fecha ? new Date(`${form.fecha}T00:00:00`) : new Date());
     setDatePickerVisible(true);
   };
 
   const openCalendarBaja = () => {
+    if (isVendido) return;
     setCalendarMonth(form.fechaBaja ? new Date(`${form.fechaBaja}T00:00:00`) : new Date());
     setDatePickerBajaVisible(true);
   };
 
   const closeCalendar = () => setDatePickerVisible(false);
-
   const closeCalendarBaja = () => setDatePickerBajaVisible(false);
 
   const selectDate = (date: Date) => {
@@ -221,16 +199,16 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
   };
 
   const goNextMonth = () => {
-    if (isAtCurrentMonth()) {
-      return;
-    }
+    if (isAtCurrentMonth()) return;
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
   const onGuardar = async () => {
-    if (!canSubmit || loading) {
+    if (isVendido) {
+      Alert.alert('No permitido', 'Este animal fue vendido y no puede modificarse.');
       return;
     }
+    if (!canSubmit || loading) return;
 
     const normalizedSelectedPhoto = form.fotoPath?.trim() ?? '';
     const normalizedInitialPhoto = initialPhotoUri?.trim() ?? '';
@@ -255,28 +233,22 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
       setLoading(true);
       await AnimalModule.updateAnimal(payload);
 
+      // ACTIVO → FALLECIDO: permitido
       if (animal.estado === 'ACTIVO' && form.estado === 'FALLECIDO') {
         await AnimalModule.changeEstado({
           id: animal.id,
           estado: 'FALLECIDO',
           fecha_baja: form.fechaBaja.trim().length > 0 ? form.fechaBaja.trim() : formatDate(new Date()),
-          motivo_baja:
-            form.motivoBaja.trim().length > 0
-              ? form.motivoBaja.trim()
-              : 'Cambio de estado registrado desde editar',
-        });
-      } else if (animal.estado === 'FALLECIDO' && form.estado === 'ACTIVO') {
-        await AnimalModule.changeEstado({
-          id: animal.id,
-          estado: 'ACTIVO',
+          motivo_baja: form.motivoBaja.trim().length > 0 ? form.motivoBaja.trim() : 'Cambio de estado registrado desde editar',
         });
       }
+      // FALLECIDO → ACTIVO: NO permitido (regla de negocio)
+      // VENDIDO → cualquiera: bloqueado arriba
 
       Alert.alert('Actualizado', `Animal ${animal.arete} actualizado correctamente.`);
       onSaved();
     } catch (updateError) {
-      const message =
-        updateError instanceof Error ? updateError.message : 'No se pudo guardar los cambios del animal.';
+      const message = updateError instanceof Error ? updateError.message : 'No se pudo guardar los cambios del animal.';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);
@@ -287,7 +259,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
+          <Text style={styles.backText}>← Volver</Text>
         </Pressable>
         <View>
           <Text style={styles.title}>Editar Animal</Text>
@@ -296,53 +268,85 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
+
+        {/* Banner de VENDIDO */}
+        {isVendido && (
+          <View style={styles.vendidoBanner}>
+            <Text style={styles.vendidoBannerTitle}>🔒 Animal Vendido</Text>
+            <Text style={styles.vendidoBannerText}>Este animal fue vendido y no puede modificarse.</Text>
+            {animal.fecha_venta && <Text style={styles.vendidoBannerText}>Fecha de venta: {animal.fecha_venta}</Text>}
+            {animal.precio_venta && <Text style={styles.vendidoBannerText}>Precio: ${animal.precio_venta.toFixed(2)}</Text>}
+          </View>
+        )}
+
         <Text style={styles.label}>Número de Arete SINIIGA 🔒</Text>
         <TextInput value={form.arete} style={[styles.input, styles.inputDisabled]} editable={false} />
         <Text style={styles.helperText}>El arete oficial no se puede modificar</Text>
 
+        {/* Selector de Estado */}
         <Text style={styles.label}>Estado actual del animal *</Text>
         <View style={styles.estadoSelectorRow}>
+          {/* Chip ACTIVO: deshabilitado si VENDIDO o si ya es FALLECIDO original */}
           <Pressable
-            style={[styles.estadoSelectorChip, form.estado === 'ACTIVO' && styles.estadoSelectorChipActive]}
-            onPress={() => setField('estado', 'ACTIVO')}
+            style={[
+              styles.estadoSelectorChip,
+              form.estado === 'ACTIVO' && styles.estadoSelectorChipActive,
+              (isVendido || isFallecidoOriginal) && styles.estadoSelectorChipDisabled,
+            ]}
+            onPress={() => {
+              if (isVendido || isFallecidoOriginal) return;
+              setField('estado', 'ACTIVO');
+            }}
+            disabled={isVendido || isFallecidoOriginal}
           >
-            <Text
-              style={[
-                styles.estadoSelectorText,
-                form.estado === 'ACTIVO' && styles.estadoSelectorTextActive,
-              ]}
-            >
+            <Text style={[
+              styles.estadoSelectorText,
+              form.estado === 'ACTIVO' && styles.estadoSelectorTextActive,
+              (isVendido || isFallecidoOriginal) && styles.estadoSelectorTextDisabled,
+            ]}>
               🟢 Activo
             </Text>
           </Pressable>
 
+          {/* Chip VENDIDO: deshabilitado si ya está VENDIDO */}
           <Pressable
             style={[
               styles.estadoSelectorChip,
               form.estado === 'VENDIDO' && styles.estadoSelectorChipVendido,
+              isVendido && styles.estadoSelectorChipDisabled,
             ]}
-            onPress={() => setVentaModalVisible(true)}
+            onPress={() => {
+              if (isVendido) return;
+              setVentaModalVisible(true);
+            }}
+            disabled={isVendido}
           >
-            <Text
-              style={[
-                styles.estadoSelectorText,
-                form.estado === 'VENDIDO' && styles.estadoSelectorTextVendido,
-              ]}
-            >
+            <Text style={[
+              styles.estadoSelectorText,
+              form.estado === 'VENDIDO' && styles.estadoSelectorTextVendido,
+            ]}>
               🟠 Vendido {form.estado === 'VENDIDO' && '✓'}
             </Text>
           </Pressable>
 
+          {/* Chip FALLECIDO: deshabilitado si ya está VENDIDO */}
           <Pressable
-            style={[styles.estadoSelectorChip, form.estado === 'FALLECIDO' && styles.estadoSelectorChipFallecido]}
-            onPress={() => setField('estado', 'FALLECIDO')}
+            style={[
+              styles.estadoSelectorChip,
+              form.estado === 'FALLECIDO' && styles.estadoSelectorChipFallecido,
+              isVendido && styles.estadoSelectorChipDisabled,
+            ]}
+            onPress={() => {
+              if (isVendido) return;
+              setField('estado', 'FALLECIDO');
+            }}
+            disabled={isVendido}
           >
-            <Text
-              style={[
-                styles.estadoSelectorText,
-                form.estado === 'FALLECIDO' && styles.estadoSelectorTextFallecido,
-              ]}
-            >
+            <Text style={[
+              styles.estadoSelectorText,
+              form.estado === 'FALLECIDO' && styles.estadoSelectorTextFallecido,
+              isVendido && styles.estadoSelectorTextDisabled,
+            ]}>
               🟣 Fallecido
             </Text>
           </Pressable>
@@ -366,7 +370,8 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           </View>
         )}
 
-        {animal.estado !== 'VENDIDO' ? (
+        {/* Toggle fallecido: solo cuando el animal ORIGINAL es ACTIVO */}
+        {animal.estado === 'ACTIVO' && !isVendido ? (
           <Pressable
             style={[styles.fallecidoToggle, form.estado === 'FALLECIDO' && styles.fallecidoToggleActive]}
             onPress={() =>
@@ -382,7 +387,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           </Pressable>
         ) : null}
 
-        {form.estado === 'FALLECIDO' ? (
+        {form.estado === 'FALLECIDO' && !isVendido ? (
           <>
             <Text style={styles.label}>Fecha de baja *</Text>
             <Pressable style={styles.dateField} onPress={openCalendarBaja}>
@@ -398,25 +403,56 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
               onChangeText={value => setField('motivoBaja', value)}
               placeholder="Describe la causa"
               style={styles.input}
+              editable={!isVendido}
             />
           </>
         ) : null}
 
-        <Text style={styles.label}>Nombre / Alias</Text>
+        {/* Raza */}
+        <Text style={styles.label}>Raza / Especie</Text>
         <View style={styles.chipWrap}>
-          {ESPECIES_OPTIONS.map(option => {
+          {ESPECIES_BASE.map(option => {
             const selected = form.especie === option;
             return (
               <Pressable
                 key={option}
-                style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => setField('especie', option)}
+                style={[styles.chip, selected && styles.chipSelected, isVendido && styles.chipDisabled]}
+                onPress={() => {
+                  if (isVendido) return;
+                  setField('especie', option);
+                }}
+                disabled={isVendido}
               >
                 <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{option}</Text>
               </Pressable>
             );
           })}
+          {/* Chip "Otro" */}
+          <Pressable
+            key="Otro"
+            style={[styles.chip, isOtroSelected && styles.chipSelected, isVendido && styles.chipDisabled]}
+            onPress={() => {
+              if (isVendido) return;
+              if (!isOtroSelected) {
+                setField('especie', '');
+              }
+            }}
+            disabled={isVendido}
+          >
+            <Text style={[styles.chipText, isOtroSelected && styles.chipTextSelected]}>Otro</Text>
+          </Pressable>
         </View>
+        {isOtroSelected && (
+          <TextInput
+            value={form.especie}
+            onChangeText={value => setField('especie', value)}
+            placeholder="Escribe la raza..."
+            style={[styles.input, { marginTop: 8 }]}
+            editable={!isVendido}
+            maxLength={50}
+            autoFocus={form.especie === ''}
+          />
+        )}
 
         <Text style={styles.label}>Sexo</Text>
         <View style={styles.chipWrap}>
@@ -425,8 +461,12 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
             return (
               <Pressable
                 key={option.value}
-                style={[styles.sexChip, selected && styles.sexChipSelected]}
-                onPress={() => setField('sexo', option.value)}
+                style={[styles.sexChip, selected && styles.sexChipSelected, isVendido && styles.chipDisabled]}
+                onPress={() => {
+                  if (isVendido) return;
+                  setField('sexo', option.value);
+                }}
+                disabled={isVendido}
               >
                 <Text style={[styles.sexChipText, selected && styles.sexChipTextSelected]}>
                   {option.value} ({option.label})
@@ -437,7 +477,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
         </View>
 
         <Text style={styles.label}>Fecha de Ingreso</Text>
-        <Pressable style={styles.dateField} onPress={openCalendar}>
+        <Pressable style={[styles.dateField, isVendido && styles.inputDisabled]} onPress={openCalendar}>
           <Text style={[styles.dateFieldText, !form.fecha && styles.dateFieldPlaceholder]}>
             {form.fecha || 'Selecciona una fecha'}
           </Text>
@@ -449,26 +489,37 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
           value={form.peso}
           onChangeText={value => setField('peso', sanitizeDigits(value))}
           placeholder="Ej. 352"
-          style={styles.input}
+          style={[styles.input, isVendido && styles.inputDisabled]}
           keyboardType="number-pad"
           maxLength={6}
+          editable={!isVendido}
         />
 
         <Text style={styles.label}>Fotografia del animal</Text>
-        <AnimalFotoCaptura
-          rutaLocal={form.fotoPath ?? initialPhotoUri}
-          onRutaLocalChange={rutaLocal => setField('fotoPath', rutaLocal)}
-        />
+        {isVendido ? (
+          <View style={styles.fotoDisabledMsg}>
+            <Text style={styles.fotoDisabledText}>Foto bloqueada — animal vendido</Text>
+          </View>
+        ) : (
+          <AnimalFotoCaptura
+            rutaLocal={form.fotoPath ?? initialPhotoUri}
+            onRutaLocalChange={rutaLocal => setField('fotoPath', rutaLocal)}
+          />
+        )}
 
-        <Pressable
-          onPress={onGuardar}
-          disabled={!canSubmit || loading}
-          style={[styles.submitButton, (!canSubmit || loading) && styles.submitDisabled]}
-        >
-          <Text style={styles.submitText}>{loading ? 'Guardando...' : 'Guardar cambios'}</Text>
-        </Pressable>
+        {/* Botón guardar: oculto si está VENDIDO */}
+        {!isVendido && (
+          <Pressable
+            onPress={onGuardar}
+            disabled={!canSubmit || loading}
+            style={[styles.submitButton, (!canSubmit || loading) && styles.submitDisabled]}
+          >
+            <Text style={styles.submitText}>{loading ? 'Guardando...' : 'Guardar cambios'}</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
+      {/* Calendar fechaIngreso */}
       <Modal visible={datePickerVisible} transparent animationType="fade" onRequestClose={closeCalendar}>
         <View style={styles.modalBackdrop}>
           <View style={styles.calendarCard}>
@@ -490,18 +541,13 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
 
             <View style={styles.weekRow}>
               {WEEKDAY_LABELS.map(day => (
-                <Text key={day} style={styles.weekLabel}>
-                  {day}
-                </Text>
+                <Text key={day} style={styles.weekLabel}>{day}</Text>
               ))}
             </View>
 
             <View style={styles.daysGrid}>
               {getMonthDays(calendarMonth).map((day, index) => {
-                if (!day) {
-                  return <View key={`empty-${index}`} style={styles.dayCell} />;
-                }
-
+                if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
                 const isSelected = form.fecha === formatDate(day);
                 const isDisabled = isFutureDate(day);
                 return (
@@ -524,6 +570,7 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
         </View>
       </Modal>
 
+      {/* Calendar fechaBaja */}
       <Modal visible={datePickerBajaVisible} transparent animationType="fade" onRequestClose={closeCalendarBaja}>
         <View style={styles.modalBackdrop}>
           <View style={styles.calendarCard}>
@@ -545,18 +592,13 @@ export function EditarAnimalScreen({ animal, onBack, onSaved }: EditarAnimalScre
 
             <View style={styles.weekRow}>
               {WEEKDAY_LABELS.map(day => (
-                <Text key={day} style={styles.weekLabel}>
-                  {day}
-                </Text>
+                <Text key={`baja-label-${day}`} style={styles.weekLabel}>{day}</Text>
               ))}
             </View>
 
             <View style={styles.daysGrid}>
               {getMonthDays(calendarMonth).map((day, index) => {
-                if (!day) {
-                  return <View key={`baja-empty-${index}`} style={styles.dayCell} />;
-                }
-
+                if (!day) return <View key={`baja-empty-${index}`} style={styles.dayCell} />;
                 const isSelected = form.fechaBaja === formatDate(day);
                 const isDisabled = isFutureDate(day);
                 return (
@@ -611,15 +653,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   backText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
   },
   title: {
@@ -635,7 +676,26 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 12,
-    paddingBottom: 28,
+    paddingBottom: 40,
+  },
+  vendidoBanner: {
+    backgroundColor: '#fff3e0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6f00',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 14,
+  },
+  vendidoBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#e65100',
+    marginBottom: 4,
+  },
+  vendidoBannerText: {
+    fontSize: 12,
+    color: '#795548',
+    fontWeight: '600',
   },
   label: {
     marginBottom: 6,
@@ -660,6 +720,7 @@ const styles = StyleSheet.create({
   inputDisabled: {
     backgroundColor: '#e8e8e8',
     color: '#646464',
+    opacity: 0.7,
   },
   estadoSelectorRow: {
     marginTop: 2,
@@ -681,7 +742,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a6b33',
   },
   estadoSelectorChipDisabled: {
-    opacity: 0.7,
+    opacity: 0.45,
   },
   estadoSelectorChipFallecido: {
     borderColor: '#9145aa',
@@ -776,6 +837,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f6f35',
     borderColor: '#0f6f35',
   },
+  chipDisabled: {
+    opacity: 0.5,
+  },
   chipText: {
     color: '#1c2b1d',
     fontWeight: '700',
@@ -824,6 +888,20 @@ const styles = StyleSheet.create({
   },
   dateFieldIcon: {
     fontSize: 16,
+  },
+  fotoDisabledMsg: {
+    borderWidth: 1,
+    borderColor: '#d8d8d8',
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
+    padding: 16,
+    alignItems: 'center',
+    opacity: 0.6,
+  },
+  fotoDisabledText: {
+    color: '#777',
+    fontWeight: '600',
+    fontSize: 13,
   },
   modalBackdrop: {
     flex: 1,
@@ -917,7 +995,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     backgroundColor: '#0a6b33',
     borderRadius: 10,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   submitDisabled: {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import CalendarioMensual from '../../components/sanitarios/CalendarioMensual';
 import { useCalendarioSanitario } from '../../hooks/useCalendarioSanitario';
 import type { EventoSanitarioModel } from '../../types/Sanitario';
@@ -53,7 +53,11 @@ export default function CalendarioSanitario() {
 
       <View style={styles.listWrap}>
         <Text style={styles.sectionTitle}>Eventos {selectedDate ? ` - ${selectedDate}` : ''}</Text>
-        {loading ? <Text>Cargando...</Text> : (
+        {loading ? (
+          <View style={styles.loaderWrap}>
+            <ActivityIndicator size="large" color="#07612d" />
+          </View>
+        ) : (
           <FlatList
             data={eventsForSelected}
             keyExtractor={(i: EventoSanitarioModel) => String(i.id)}
@@ -89,4 +93,5 @@ const styles = StyleSheet.create({
   eventDesc: { marginTop: 4 },
   eventMeta: { marginTop: 6, color: '#888', fontSize: 12 },
   emptyText: { color: '#777' },
+  loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
 });

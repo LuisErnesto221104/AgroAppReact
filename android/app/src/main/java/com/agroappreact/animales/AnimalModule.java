@@ -88,13 +88,19 @@ public class AnimalModule extends ReactContextBaseJavaModule {
                     peso = payload.getDouble("peso");
                 }
 
+                Double precioCompra = null;
+                if (payload.hasKey("precio_compra") && !payload.isNull("precio_compra")) {
+                    precioCompra = payload.getDouble("precio_compra");
+                }
+
                 long animalId = animalDAO.insertAnimal(
                         arete,
                         especie,
                         sexo,
                         fecha,
                         peso,
-                        fotoRelativePath
+                        fotoRelativePath,
+                        precioCompra
                 );
 
                 if (animalId <= 0) {
@@ -519,6 +525,11 @@ public class AnimalModule extends ReactContextBaseJavaModule {
             map.putNull("motivo_baja");
         } else {
             map.putString("motivo_baja", record.motivoBaja);
+        }
+        if (record.precioCompra == null) {
+            map.putDouble("precio_compra", 0.0);
+        } else {
+            map.putDouble("precio_compra", record.precioCompra);
         }
         return map;
     }

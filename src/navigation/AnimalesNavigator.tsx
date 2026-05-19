@@ -7,6 +7,7 @@ import { AnimalModel } from '../types/Animal';
 import { DetalleAnimalScreen } from '../screens/animales/DetalleAnimalScreen';
 import HistorialClinico from '../features/animals/screens/HistorialClinico';
 import { RegistrarEventoSanitario } from '../screens/sanitarios/RegistrarEventoSanitario';
+import { ReporteAnimalScreen } from '../features/reports/screens/ReporteAnimalScreen';
 
 type AnimalesNavigatorProps = {
   onBack: () => void;
@@ -18,7 +19,8 @@ type AnimalRoute =
   | { name: 'detail'; animalId: number; refreshToken: number }
   | { name: 'historial'; animalId: number }
   | { name: 'registerEvent'; animalId: number }
-  | { name: 'edit'; animal: AnimalModel };
+  | { name: 'edit'; animal: AnimalModel }
+  | { name: 'reporteAnimal'; animalId: number; arete: string };
 
 export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
   const [route, setRoute] = useState<AnimalRoute>({ name: 'list' });
@@ -41,6 +43,17 @@ export function AnimalesNavigator({ onBack }: AnimalesNavigatorProps) {
         onEdit={animal => setRoute({ name: 'edit', animal })}
         onDeleted={refreshList}
         onOpenHistorial={animalId => setRoute({ name: 'historial', animalId })}
+        onOpenReporteAnimal={(animalId, arete) => setRoute({ name: 'reporteAnimal', animalId, arete })}
+      />
+    );
+  }
+
+  if (route.name === 'reporteAnimal') {
+    return (
+      <ReporteAnimalScreen
+        animalId={route.animalId}
+        arete={route.arete}
+        onBack={() => setRoute({ name: 'detail', animalId: route.animalId, refreshToken: Date.now() })}
       />
     );
   }

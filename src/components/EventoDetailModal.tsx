@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Alert, Modal, View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { COLORS, FONTS } from '../shared/theme/identity';
 
 type EventoDetailModalProps = {
@@ -7,10 +7,11 @@ type EventoDetailModalProps = {
   evento: any;
   onClose: () => void;
   onEdit?: (evento: any) => void;
+  onDelete?: (evento: any) => void;
   arete?: string;
 };
 
-export function EventoDetailModal({ visible, evento, onClose, onEdit, arete }: EventoDetailModalProps) {
+export function EventoDetailModal({ visible, evento, onClose, onEdit, onDelete, arete }: EventoDetailModalProps) {
   if (!evento) return null;
 
   return (
@@ -74,7 +75,24 @@ export function EventoDetailModal({ visible, evento, onClose, onEdit, arete }: E
           <View style={styles.actions}>
             {onEdit && (
               <Pressable style={styles.editBtn} onPress={() => onEdit(evento)}>
-                <Text style={styles.editBtnText}>✎ Modificar Evento</Text>
+                <Text style={styles.editBtnText}>✎ Modificar</Text>
+              </Pressable>
+            )}
+            {onDelete && (
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={() => {
+                  Alert.alert(
+                    'Eliminar evento',
+                    '¿Estás seguro de que deseas eliminar este evento sanitario? Esta acción no se puede deshacer.',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      { text: 'Eliminar', style: 'destructive', onPress: () => onDelete(evento) },
+                    ],
+                  );
+                }}
+              >
+                <Text style={styles.deleteBtnText}>🗑 Eliminar</Text>
               </Pressable>
             )}
             <Pressable style={styles.closeActionBtn} onPress={onClose}>
@@ -175,6 +193,22 @@ const styles = StyleSheet.create({
   },
   editBtnText: {
     color: '#fff',
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deleteBtn: {
+    flex: 1,
+    backgroundColor: '#fff0f0',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e53935',
+  },
+  deleteBtnText: {
+    color: '#e53935',
     fontFamily: FONTS.semiBold,
     fontSize: 14,
     fontWeight: '700',

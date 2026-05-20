@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Pressable,
   Alert,
+  ActivityIndicator,
   StyleSheet,
   Text,
   RefreshControl,
@@ -178,10 +179,10 @@ export function GestionGastosScreen({
 
   // ── Loading ───────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (loading && gastos.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>⏳ Cargando gastos...</Text>
+        <ActivityIndicator size="large" color="#07612d" />
       </View>
     );
   }
@@ -280,6 +281,11 @@ export function GestionGastosScreen({
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
+      {/* Overlay de carga para recargas parciales (cambio de filtros) */}
+      {loading && gastos.length > 0 && (
+        <ActivityIndicator size="large" color="#07612d" style={styles.loaderOverlay} />
+      )}
+
       {/* Modal de filtros */}
       <FiltroGastosModal
         visible={filtroVisible}
@@ -294,7 +300,10 @@ export function GestionGastosScreen({
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#f5f5f5' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText:     { fontSize: 16, fontFamily: 'Poppins-Regular', color: '#666' },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+  },
 
   // Header
   header: {

@@ -2,6 +2,7 @@ package com.agroappreact
 
 import android.app.Application
 import com.agroappreact.bridge.AgroAppPackage
+import com.agroappreact.costs.CostosModulePackage
 import com.agroappreact.pdf.PdfModulePackage
 import com.agroappreact.share.ShareModulePackage
 import com.facebook.react.PackageList
@@ -19,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           // Agregamos el package manual porque es un Native Module local del proyecto.
           add(AgroAppPackage())
+          add(CostosModulePackage())
           add(PdfModulePackage())
           add(ShareModulePackage())
         },

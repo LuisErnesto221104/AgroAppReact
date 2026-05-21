@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+
 import { pdfModule } from '../../../native/pdfModule';
 import { ReporteAnimalScreen } from './ReporteAnimalScreen';
 import { COLORS, FONTS } from '../../../shared/theme/identity';
@@ -118,6 +119,7 @@ export function ReportesMenuScreen({ onBack }: ReportesMenuScreenProps) {
           description="Datos, historial clínico y gastos de un animal específico."
           onPress={() => setView('selector')}
         />
+
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
-  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { pdfModule } from '../../../native/pdfModule';
+import { shareModule } from '../../../native/shareModule';
 import { COLORS, FONTS } from '../../../shared/theme/identity';
 
 type ReporteHatoScreenProps = {
@@ -33,13 +34,17 @@ export function ReporteHatoScreen({ onBack }: ReporteHatoScreenProps) {
       .finally(() => setCargando(false));
   };
 
-  // Stub — integración completa en Anexo D
+  const [compartiendo, setCompartiendo] = useState(false);
+
   const compartirPdf = async () => {
     if (!rutaPdf) return;
+    setCompartiendo(true);
     try {
-      await Share.share({ title: 'Reporte del Hato — AgroApp', url: `file://${rutaPdf}` });
-    } catch {
-      // ignorar cancelación del sistema
+      await shareModule.sharePdf(rutaPdf, 'Reporte del Hato — AgroApp');
+    } catch (e: any) {
+      Alert.alert('Error al compartir', e.message || 'No se pudo compartir el PDF.');
+    } finally {
+      setCompartiendo(false);
     }
   };
 
@@ -97,15 +102,17 @@ export function ReporteHatoScreen({ onBack }: ReporteHatoScreenProps) {
               {rutaPdf}
             </Text>
 
-            {/* Botón secundario — stub Anexo D */}
             <Pressable
               style={({ pressed }) => [
                 styles.shareButton,
-                pressed && styles.shareButtonPressed,
+                (pressed || compartiendo) && styles.shareButtonPressed,
               ]}
               onPress={compartirPdf}
+              disabled={compartiendo}
             >
-              <Text style={styles.shareButtonText}>↑ Compartir PDF</Text>
+              {compartiendo
+                ? <ActivityIndicator size="small" color="#07612d" />
+                : <Text style={styles.shareButtonText}>↑ Compartir PDF</Text>}
             </Pressable>
           </View>
         )}

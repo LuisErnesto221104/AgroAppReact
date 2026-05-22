@@ -19,10 +19,11 @@ import type { EventoSanitarioModel } from '../../../types/Sanitario';
 import { COLORS, FONTS } from '../../../shared/theme/identity';
 import {
   cancelarNotificacionesEventos,
+  cancelarNotificacionEventoEnFecha,
   getNotificationsEnabled,
   reprogramarNotificacionesEventos,
   setNotificationsEnabled,
-  programarNotificacionEvento,
+  programarNotificacionEventoEnFecha,
   checkNotificationPermission,
   openAppSettings,
 } from '../../../shared/services/notificacionSanitaria';
@@ -463,8 +464,10 @@ function NotificationCard({ item, onPress }: { item: NotificationItem; onPress: 
     }
 
     try {
-      await programarNotificacionEvento(item.evento);
-      if (Platform.OS === 'android') {
+      const result = await programarNotificacionEventoEnFecha(item.evento, item.dateKey);
+      if (!result.programada) {
+        Alert.alert('Notificaciones desactivadas', 'Activa las alertas y permisos para reprogramar esta notificación.');
+      } else if (Platform.OS === 'android') {
         ToastAndroid.show('Notificación reprogramada', ToastAndroid.SHORT);
       } else {
         Alert.alert('Listo', 'Notificación reprogramada.');
@@ -481,7 +484,7 @@ function NotificationCard({ item, onPress }: { item: NotificationItem; onPress: 
     }
 
     try {
-      await cancelarNotificacionesEventos([item.evento]);
+      await cancelarNotificacionEventoEnFecha(item.evento, item.dateKey);
       if (Platform.OS === 'android') {
         ToastAndroid.show('Notificación cancelada', ToastAndroid.SHORT);
       } else {
@@ -509,10 +512,22 @@ function NotificationCard({ item, onPress }: { item: NotificationItem; onPress: 
         </Pressable>
 
         <View style={styles.cardActions}>
-          <Pressable style={styles.cardActionButton} onPress={handleReprogram}>
+          <Pressable
+            style={styles.cardActionButton}
+            onPress={event => {
+              event.stopPropagation();
+              void handleReprogram();
+            }}
+          >
             <Text style={styles.cardActionText}>Reprogramar</Text>
           </Pressable>
-          <Pressable style={styles.cardActionOutline} onPress={handleCancel}>
+          <Pressable
+            style={styles.cardActionOutline}
+            onPress={event => {
+              event.stopPropagation();
+              void handleCancel();
+            }}
+          >
             <Text style={styles.cardActionOutlineText}>Cancelar</Text>
           </Pressable>
         </View>

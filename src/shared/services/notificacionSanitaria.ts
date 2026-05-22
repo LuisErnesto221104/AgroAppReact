@@ -72,6 +72,17 @@ const emojiByTipo = (tipo: string): string => {
   }
 };
 
+const buildNotificationContent = (evento: EventoSanitarioModel, fechaISO: string) => {
+  const emoji = emojiByTipo(String(evento.tipoEvento));
+  const eventoNombre = (evento.descripcion || evento.tipoEvento).trim();
+  const descripcion = `Animal ID: ${evento.animalId} · Evento sanitario: ${fechaISO}`;
+
+  return {
+    titulo: `${emoji} ${eventoNombre}`,
+    descripcion,
+  };
+};
+
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (Platform.OS !== 'android') {
     return true;
@@ -133,22 +144,47 @@ export const programarNotificacionEvento = async (evento: EventoSanitarioModel):
   menosTres.setDate(baseDate.getDate() - 3);
   const fechaMenosTres = formatAsIsoDate(menosTres);
 
-  const emoji = emojiByTipo(String(evento.tipoEvento));
-  const eventoNombre = (evento.descripcion || evento.tipoEvento).trim();
-  const descripcion = `Animal ID: ${evento.animalId} · Próximo evento: ${fechaExacta}`;
+  const content = buildNotificationContent(evento, fechaExacta);
 
   await native.programarAlarma(
     evento.animalId,
     fechaMenosTres,
-    `${emoji} ${eventoNombre} en 3 dias`,
-    descripcion,
+    `${content.titulo} en 3 dias`,
+    content.descripcion,
   );
   await native.programarAlarma(
     evento.animalId,
     fechaExacta,
-    `${emoji} ${eventoNombre} hoy`,
-    descripcion,
+    `${content.titulo} hoy`,
+    content.descripcion,
   );
+};
+
+export const programarNotificacionEventoEnFecha = async (
+  evento: EventoSanitarioModel,
+  fechaISO: string,
+): Promise<{ programada: boolean; alarmId?: number }> => {
+  const notificationsEnabled = await getNotificationsEnabled();
+  if (!notificationsEnabled) {
+    return { programada: false };
+  }
+
+  const allowed = await requestNotificationPermission();
+  if (!allowed) {
+    return { programada: false };
+  }
+
+  const native = getNative();
+  const fechaExacta = fechaISO.slice(0, 10);
+  const content = buildNotificationContent(evento, fechaExacta);
+  const result = await native.programarAlarma(
+    evento.animalId,
+    fechaExacta,
+    `${content.titulo} hoy`,
+    content.descripcion,
+  );
+
+  return { programada: true, alarmId: result.alarmId };
 };
 
 export const reprogramarNotificacionesEventos = async (
@@ -198,6 +234,17 @@ export const cancelarNotificacionesEventos = async (
 export const cancelarNotificacion = async (id: number): Promise<void> => {
   const native = getNative();
   await native.cancelarAlarma(id);
+};
+
+export const cancelarNotificacionEventoEnFecha = async (
+  evento: EventoSanitarioModel,
+  fechaISO: string,
+): Promise<{ cancelada: boolean; alarmId: number }> => {
+  const native = getNative();
+  const fechaExacta = fechaISO.slice(0, 10);
+  const alarmId = buildRequestCode(evento.animalId, fechaExacta);
+  await native.cancelarAlarma(alarmId);
+  return { cancelada: true, alarmId };
 };
 
 export const programarNotificacionPrueba = async (): Promise<number> => {

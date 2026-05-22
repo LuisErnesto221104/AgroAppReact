@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +35,14 @@ const FILTRO_VACIO: FiltroGastosParams = {
 
 const CATEGORIAS = Object.values(CategoriaGasto);
 
+// Auto-inserta guiones: 20260507 → 2026-05-07
+function formatFecha(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 4) return d;
+  if (d.length <= 6) return `${d.slice(0, 4)}-${d.slice(4)}`;
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`;
+}
+
 export function FiltroGastosModal({ visible, onClose, onAplicar }: FiltroGastosModalProps) {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
@@ -48,65 +58,71 @@ export function FiltroGastosModal({ visible, onClose, onAplicar }: FiltroGastosM
 
   const handleAplicar = () => {
     const desde = fechaDesde.trim() || null;
-    const hasta = fechaHasta.trim() || null;
-
+    const hasta  = fechaHasta.trim() || null;
     if (desde && hasta && hasta < desde) {
-      Alert.alert(
-        'Rango inválido',
-        'La fecha "Hasta" no puede ser anterior a la fecha "Desde".',
-        [{ text: 'Entendido' }],
-      );
+      Alert.alert('Rango inválido', 'La fecha "Hasta" no puede ser anterior a "Desde".', [{ text: 'Entendido' }]);
       return;
     }
-
     onAplicar({ fechaDesde: desde, fechaHasta: hasta, categoria });
     onClose();
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+
+      {/* Contenedor full-screen: backdrop arriba + sheet abajo como HERMANOS */}
+      <View style={styles.container}>
+
+        {/* Backdrop — toca aquí para cerrar */}
+        <Pressable style={styles.backdrop} onPress={onClose} />
+
+        {/* Sheet — sube con el teclado en iOS */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheet}
+        >
+          {/* Tirador visual */}
+          <View style={styles.handle} />
 
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Filtrar Gastos</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
+            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={10}>
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
           </View>
 
+          {/* Cuerpo con scroll */}
           <ScrollView
-            style={styles.body}
-            contentContainerStyle={styles.bodyContent}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.bodyContent}
           >
-            {/* Rango de fechas */}
+            {/* Fechas */}
             <Text style={styles.sectionLabel}>RANGO DE FECHAS</Text>
+            <Text style={styles.hint}>Solo escribe números — los guiones se insertan solos</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Desde YYYY-MM-DD"
+              placeholder="Desde  YYYY-MM-DD"
               placeholderTextColor="#a0b4a8"
-              keyboardType="numeric"
+              keyboardType="number-pad"
               value={fechaDesde}
-              onChangeText={setFechaDesde}
+              onChangeText={v => setFechaDesde(formatFecha(v))}
               maxLength={10}
+              autoCorrect={false}
+              returnKeyType="next"
             />
             <TextInput
               style={styles.input}
-              placeholder="Hasta YYYY-MM-DD"
+              placeholder="Hasta  YYYY-MM-DD"
               placeholderTextColor="#a0b4a8"
-              keyboardType="numeric"
+              keyboardType="number-pad"
               value={fechaHasta}
-              onChangeText={setFechaHasta}
+              onChangeText={v => setFechaHasta(formatFecha(v))}
               maxLength={10}
+              autoCorrect={false}
+              returnKeyType="done"
             />
 
             {/* Categoría */}
@@ -116,8 +132,9 @@ export function FiltroGastosModal({ visible, onClose, onAplicar }: FiltroGastosM
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsRow}
+              keyboardShouldPersistTaps="always"
+              nestedScrollEnabled
             >
-              {/* Chip Todas */}
               <Pressable
                 style={[styles.chip, categoria === null && styles.chipActive]}
                 onPress={() => setCategoria(null)}
@@ -161,24 +178,42 @@ export function FiltroGastosModal({ visible, onClose, onAplicar }: FiltroGastosM
             </Pressable>
           </View>
 
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  // Contenedor full-screen
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
+
+  // Backdrop semitransparente — flex:1 ocupa todo el espacio sobre el sheet
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+
+  // Sheet — altura natural según contenido, máx 85% de pantalla
   sheet: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    overflow: 'hidden',
+    maxHeight: '85%',
+    // SIN overflow:'hidden' — bloqueaba TextInput en Android
+  },
+
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#dde8dd',
+    marginTop: 10,
+    marginBottom: 4,
   },
 
   // Header
@@ -187,7 +222,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#eef2ee',
@@ -198,11 +233,11 @@ const styles = StyleSheet.create({
     color: '#1c2b1d',
   },
   closeBtn: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: '#f0f4f0',
   },
   closeBtnText: {
@@ -211,39 +246,45 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
   },
 
-  // Body
-  body: { flex: 1 },
+  // Cuerpo
   bodyContent: {
     padding: 20,
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   sectionLabel: {
     fontSize: 10,
     fontFamily: FONTS.bold,
     color: '#6a8a72',
     letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  hint: {
+    fontSize: 11,
+    fontFamily: FONTS.regular,
+    color: '#a0b4a8',
     marginBottom: 10,
   },
 
   // Inputs
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#c8dece',
     borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 13,
     fontFamily: FONTS.regular,
-    fontSize: 14,
+    fontSize: 15,
     color: '#1c2b1d',
-    backgroundColor: '#f9fcf9',
+    backgroundColor: '#ffffff',
     marginBottom: 10,
   },
 
-  // Chips
+  // Chips de categoría
   chipsRow: {
     flexDirection: 'row',
     gap: 8,
     paddingBottom: 4,
+    paddingTop: 2,
   },
   chip: {
     paddingHorizontal: 14,

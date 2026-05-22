@@ -252,8 +252,8 @@ public class AnimalDAO {
         int safeLimit = limit <= 0 ? 10 : limit;
         List<EventoRecord> eventos = new ArrayList<>();
         Cursor cursor = db.rawQuery(
-                "SELECT id, fecha, enfermedad, sintomas, tratamiento, estado, observaciones " +
-                        "FROM historial_clinico WHERE animal_id=? ORDER BY fecha DESC LIMIT " + safeLimit,
+                "SELECT id, fecha_evento, tipo_evento, descripcion, dosis, veterinario, observaciones " +
+                        "FROM eventos_sanitarios WHERE animal_id=? ORDER BY fecha_evento DESC LIMIT " + safeLimit,
                 new String[]{String.valueOf(animalId)}
         );
 
@@ -262,11 +262,15 @@ public class AnimalDAO {
                 do {
                     EventoRecord record = new EventoRecord();
                     record.id = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
-                    record.fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha"));
-                    record.enfermedad = cursor.getString(cursor.getColumnIndexOrThrow("enfermedad"));
-                    record.sintomas = cursor.getString(cursor.getColumnIndexOrThrow("sintomas"));
-                    record.tratamiento = cursor.getString(cursor.getColumnIndexOrThrow("tratamiento"));
-                    record.estado = cursor.getString(cursor.getColumnIndexOrThrow("estado"));
+                    record.fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha_evento"));
+                    String tipoEvento = cursor.getString(cursor.getColumnIndexOrThrow("tipo_evento"));
+                    String descripcion = cursor.getString(cursor.getColumnIndexOrThrow("descripcion"));
+                    record.enfermedad = descripcion == null || descripcion.trim().isEmpty()
+                            ? tipoEvento
+                            : descripcion;
+                    record.sintomas = cursor.getString(cursor.getColumnIndexOrThrow("dosis"));
+                    record.tratamiento = cursor.getString(cursor.getColumnIndexOrThrow("veterinario"));
+                    record.estado = tipoEvento;
                     record.observaciones = cursor.getString(cursor.getColumnIndexOrThrow("observaciones"));
                     eventos.add(record);
                 } while (cursor.moveToNext());

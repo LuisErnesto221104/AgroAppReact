@@ -85,7 +85,9 @@ export interface PesoHistorialPoint {
 export interface EventoSanitarioResumen {
   id: number;
   fecha: string | null;
+  fechaEvento?: string | null;
   enfermedad: string | null;
+  descripcion?: string | null;
   sintomas: string | null;
   tratamiento: string | null;
   estado: string | null;

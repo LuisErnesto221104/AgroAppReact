@@ -8,7 +8,6 @@ import { DetalleAnimalScreen } from '../screens/animales/DetalleAnimalScreen';
 import HistorialClinico from '../features/animals/screens/HistorialClinico';
 import { RegistrarEventoSanitario } from '../screens/sanitarios/RegistrarEventoSanitario';
 import { ReporteAnimalScreen } from '../features/reports/screens/ReporteAnimalScreen';
-
 type AnimalesNavigatorProps = {
   onBack: () => void;
 };
